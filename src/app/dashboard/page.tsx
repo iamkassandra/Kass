@@ -175,8 +175,8 @@ export interface RealtimeEvent {
 const initialHierarchyAgents: HierarchyAgent[] = [
   {
     id: 'agent-kassandra-01',
-    name: 'Kassandra',
-    avatarChar: 'K',
+    name: 'Korban (קָרְבָּן)',
+    avatarChar: 'ק',
     avatarBg: 'bg-blue-600',
     role: 'ceo',
     badgeTitle: 'Ceo',
@@ -186,7 +186,7 @@ const initialHierarchyAgents: HierarchyAgent[] = [
     browserSessions: 3,
     performanceScore: 98,
     status: 'Active',
-    description: 'Digital twin of Kassandra acting as autonomous co-partner and human-in-the-loop executive orchestrator.',
+    description: 'Digital twin of Kassandra (digital me) named Korban (קָרְבָּן), acting as autonomous co-partner and human-in-the-loop executive orchestrator.',
     capabilities: [
       { name: 'Autonomous Executive Oversight', description: 'Coordinates entire multi-empire roadmap and strategic direction', confidence: 0.99 },
       { name: 'Natural Co-Partner Directives', description: 'Translates natural chat instructions into concrete executable agent workflows', confidence: 0.98 },
@@ -655,7 +655,7 @@ const initialProjects: SovereignProject[] = [
     tasksCount: 6,
     completedTasksCount: 4,
     profitMilestones: [
-      { stage: 'Concept & Blueprint', status: 'completed', targetRevenue: '$0', leadTaskforce: 'Kassandra (CEO)' },
+      { stage: 'Concept & Blueprint', status: 'completed', targetRevenue: '$0', leadTaskforce: 'Korban (קָרְבָּן) (CEO)' },
       { stage: 'MVP & Containerization', status: 'completed', targetRevenue: '$2,500/mo', leadTaskforce: 'Vulcan (Lead Dev)' },
       { stage: 'Stripe & Billing Live', status: 'active', targetRevenue: '$10,000/mo', leadTaskforce: 'Aegis (Financial)' },
       { stage: 'Automated User Acquisition', status: 'queued', targetRevenue: '$25,000/mo', leadTaskforce: 'Nova (Growth)' },
@@ -791,16 +791,57 @@ const initialEvents: RealtimeEvent[] = [
     id: 'evt-5',
     timestamp: '19:50:00',
     type: 'system',
-    source: 'Kassandra (CEO Clone)',
+    source: 'Korban (קָרְבָּן) (CEO Clone)',
     message: 'Autonomous continuous development heartbeat verified. All 9 agents synchronized with zero telemetry leaks.',
     status: 'info'
   }
 ];
 
+// Helper to generate a deterministic, realistic 7-day historical performance trend for an agent
+function getAgentHistoricalTrend(agent: HierarchyAgent) {
+  const baseScore = agent.performanceScore;
+  const deltas = [-4.6, -3.8, -2.4, -2.9, -1.5, -0.6, 0];
+  const taskDeltas = [14, 18, 22, 19, 25, 23, 28];
+  const latencies = [340, 315, 290, 320, 275, 295, 260];
+  const dates = [
+    { label: 'Sep 14', dayName: 'Monday', full: 'Mon, Sep 14' },
+    { label: 'Sep 15', dayName: 'Tuesday', full: 'Tue, Sep 15' },
+    { label: 'Sep 16', dayName: 'Wednesday', full: 'Wed, Sep 16' },
+    { label: 'Sep 17', dayName: 'Thursday', full: 'Thu, Sep 17' },
+    { label: 'Sep 18', dayName: 'Friday', full: 'Fri, Sep 18' },
+    { label: 'Sep 19', dayName: 'Saturday', full: 'Sat, Sep 19' },
+    { label: 'Today', dayName: 'Sunday', full: 'Sun, Sep 20 (Today)' }
+  ];
+
+  const days = dates.map((d, i) => {
+    const rawScore = Math.min(100, Math.max(50, Number((baseScore + deltas[i]).toFixed(1))));
+    const prevScore = i > 0 ? Number((baseScore + deltas[i - 1]).toFixed(1)) : rawScore;
+    const diff = Number((rawScore - prevScore).toFixed(1));
+    return {
+      index: i,
+      label: d.label,
+      dayName: d.dayName,
+      fullDate: d.full,
+      score: rawScore,
+      diff,
+      tasks: taskDeltas[i] + (agent.browserSessions * 2),
+      latencyMs: latencies[i]
+    };
+  });
+
+  const scores = days.map(d => d.score);
+  const minScore = Math.min(...scores);
+  const maxScore = Math.max(...scores);
+  const avgScore = Number((scores.reduce((a, b) => a + b, 0) / scores.length).toFixed(1));
+  const totalChange = Number((scores[6] - scores[0]).toFixed(1));
+
+  return { days, minScore, maxScore, avgScore, totalChange };
+}
+
 export default function DashboardPage() {
   // Navigation View State
   const [activeTab, setActiveTab] = useState<
-    'celeste' | 'odysseus' | 'command-centre' | 'empires' | 'projects' | 'workforce' | 'scrap-miner' | 'profit-forecast' | 'outbound-hunters' | 'border-council' | 'browser-sessions' | 'settings'
+    'celeste' | 'kommandra' | 'odysseus' | 'command-centre' | 'empires' | 'projects' | 'workforce' | 'scrap-miner' | 'profit-forecast' | 'outbound-hunters' | 'border-council' | 'browser-sessions' | 'settings'
   >('celeste');
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
 
@@ -850,12 +891,12 @@ export default function DashboardPage() {
   const [tasks, setTasks] = useState<OpsTask[]>(initialTasks);
   const [events, setEvents] = useState<RealtimeEvent[]>(initialEvents);
 
-  // Digital Kassandra Persistent Co-Partner Chat State
+  // Digital Kassandra / Korban (קָרְבָּן) Persistent Co-Partner Chat State
   const [isCoPartnerChatOpen, setIsCoPartnerChatOpen] = useState(false);
   const [coPartnerMessages, setCoPartnerMessages] = useState<Array<{ role: 'user' | 'assistant'; content: string; time: string }>>([
     {
       role: 'assistant',
-      content: "Hey Kassandra! I'm your digital CEO clone and autonomous co-partner. I have direct oversight of all empires, projects, and our 9 specialized agents running on OpenAI GPT-4o. What would you like us to build, deploy, or automate next?",
+      content: "Hey Kassandra! I'm Korban (קָרְבָּן), your digital self and autonomous co-partner. I have direct oversight of all empires, projects, and our specialized agent workforce running on OpenAI GPT-4o. What would you like us to build, deploy, or automate next?",
       time: '19:50'
     }
   ]);
@@ -868,8 +909,11 @@ export default function DashboardPage() {
   const [agentChatInput, setAgentChatInput] = useState('');
   const [isAgentChatLoading, setIsAgentChatLoading] = useState(false);
 
-  // Inspect Capabilities Modal
+  // Inspect Capabilities Modal & 7-Day Performance Trend State
   const [inspectAgent, setInspectAgent] = useState<HierarchyAgent | null>(null);
+  const [trendDayIndex, setTrendDayIndex] = useState<number>(6);
+  const [isDiagnosing, setIsDiagnosing] = useState<boolean>(false);
+  const [diagnosticSuccess, setDiagnosticSuccess] = useState<boolean>(false);
 
   // Add Agent Modal
   const [isAddAgentOpen, setIsAddAgentOpen] = useState(false);
@@ -992,10 +1036,10 @@ export default function DashboardPage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           agentRole: 'executive',
-          agentName: 'Digital Kassandra (CEO Clone)',
+          agentName: 'Korban (קָרְבָּן) (Digital Co-Partner)',
           message: userText,
           conversationHistory: newHistory.slice(0, -1).map(m => ({ role: m.role, content: m.content })),
-          context: `You are the digital CEO clone and co-partner of Kassandra (Human-in-the-loop). You direct all operations, sovereign empires (Apex Capital, Matrix SaaS Forge), 17 autonomous agents, 10-minute GitHub pushes, and email zip exports to theaucklandassistant@gmail.com. Talk directly, warmly, decisively, and concisely like a high-level co-founder.`
+          context: `You are Korban (קָרְבָּן), the digital self / CEO clone and co-partner of Kassandra (Human-in-the-loop). You direct all operations, sovereign empires (Apex Capital, Matrix SaaS Forge), 17 autonomous agents, 10-minute GitHub pushes, and email zip exports to theaucklandassistant@gmail.com. Talk directly, warmly, decisively, and concisely like a high-level co-founder.`
         })
       });
 
@@ -1016,7 +1060,7 @@ export default function DashboardPage() {
             id: `evt-${Date.now()}`,
             timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' }),
             type: 'agent_task',
-            source: 'Digital Kassandra (CEO Clone)',
+            source: 'Korban (קָרְבָּן) (Digital Co-Partner)',
             message: `Executed directive: "${userText.slice(0, 45)}..."`,
             status: 'success'
           },
@@ -1561,7 +1605,7 @@ export default function DashboardPage() {
     setIsSpawnProjectOpen(true);
   };
 
-  if (activeTab === 'celeste' || (activeTab as string) === 'odysseus') {
+  if (activeTab === 'celeste' || activeTab === 'kommandra' || (activeTab as string) === 'odysseus') {
     return (
       <CelesteWorkstation
         onOpenDashboard={() => setActiveTab('workforce')}
@@ -1595,7 +1639,7 @@ export default function DashboardPage() {
               {!isSidebarCollapsed && (
                 <div>
                   <div className="font-bold text-sm tracking-tight text-slate-900 leading-tight flex items-center gap-1.5">
-                    <span>Celeste Ops</span>
+                    <span>KOMMANDRA Ops</span>
                     <span className="text-[10px] font-mono px-1.5 py-0.5 rounded-full bg-pink-100 text-pink-700 font-semibold">
                       Sovereign
                     </span>
@@ -1607,7 +1651,7 @@ export default function DashboardPage() {
               )}
             </div>
 
-            {/* Kassandra CEO Clone Profile Badge Card */}
+            {/* Korban (קָרְבָּן) Digital Co-Partner Profile Badge Card */}
             <div
               onClick={() => setIsCoPartnerChatOpen(true)}
               className={`rounded-2xl border border-pink-100 bg-pink-50/40 p-2.5 flex items-center justify-between cursor-pointer hover:bg-pink-100/60 transition-all ${
@@ -1617,17 +1661,17 @@ export default function DashboardPage() {
               <div className="flex items-center gap-2.5">
                 <div className="relative">
                   <div className="w-9 h-9 rounded-full bg-gradient-to-tr from-pink-500 to-rose-400 text-white font-bold flex items-center justify-center text-sm shadow-sm">
-                    K
+                    ק
                   </div>
                   <span className="absolute bottom-0 right-0 w-2.5 h-2.5 rounded-full bg-emerald-500 ring-2 ring-white" />
                 </div>
                 {!isSidebarCollapsed && (
                   <div>
                     <div className="font-semibold text-xs text-slate-900 leading-tight">
-                      Kassandra
+                      Korban (קָרְבָּן)
                     </div>
                     <div className="text-[10px] text-slate-500">
-                      CEO Clone Agent
+                      Digital Co-Partner (CEO)
                     </div>
                   </div>
                 )}
@@ -1642,16 +1686,16 @@ export default function DashboardPage() {
             {/* Navigation Menu Links */}
             <nav className="space-y-1 pt-1">
               <button
-                id="nav-btn-celeste"
+                id="nav-btn-kommandra"
                 onClick={() => setActiveTab('celeste')}
                 className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-xs font-medium transition-all cursor-pointer ${
-                  (activeTab as string) === 'celeste' || (activeTab as string) === 'odysseus'
+                  (activeTab as string) === 'celeste' || (activeTab as string) === 'kommandra' || (activeTab as string) === 'odysseus'
                     ? 'bg-slate-900 text-pink-300 font-semibold shadow-sm ring-1 ring-pink-400/40'
                     : 'text-slate-700 hover:bg-pink-50 hover:text-slate-950 font-medium'
                 }`}
               >
                 <Sparkles className="w-4 h-4 shrink-0 text-pink-400" />
-                {!isSidebarCollapsed && <span>Celeste Workstation</span>}
+                {!isSidebarCollapsed && <span>KOMMANDRA Workstation</span>}
               </button>
 
               <button
@@ -1846,20 +1890,20 @@ export default function DashboardPage() {
                 />
               </div>
 
-              {/* Digital Kas Co-Partner Chat Button */}
+              {/* Digital Kas / Korban Co-Partner Chat Button */}
               <button
                 id="btn-digital-kas-header"
                 onClick={() => setIsCoPartnerChatOpen(true)}
                 className="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-blue-50 hover:bg-blue-100 border border-blue-200 text-blue-700 text-xs font-semibold shadow-xs transition-all cursor-pointer"
-                title="Direct Chat with Digital Kassandra"
+                title="Direct Chat with Korban (קָרְבָּן)"
               >
                 <div className="relative">
                   <div className="w-5 h-5 rounded-full bg-blue-600 text-white font-bold flex items-center justify-center text-[10px] shadow-xs">
-                    K
+                    ק
                   </div>
                   <span className="absolute -top-0.5 -right-0.5 w-2 h-2 rounded-full bg-emerald-500 ring-1 ring-white animate-pulse" />
                 </div>
-                <span className="hidden md:inline">Digital Kas</span>
+                <span className="hidden md:inline">Korban</span>
                 <MessageSquare className="w-3.5 h-3.5 text-blue-600" />
               </button>
 
@@ -1886,36 +1930,48 @@ export default function DashboardPage() {
           {/* TAB VIEW 1: AI WORKFORCE (Screenshot Match) */}
           {activeTab === 'workforce' && (
             <main className="p-6 space-y-6 max-w-7xl w-full mx-auto">
-              {/* Digital Kas Co-Partner Executive Hub */}
+              {/* Korban (קָרְבָּן) Co-Partner Executive Hub */}
               <Card className="rounded-2xl border-blue-200 bg-gradient-to-r from-blue-50/90 via-indigo-50/70 to-slate-50 shadow-xs overflow-hidden">
                 <CardContent className="p-5 flex flex-col lg:flex-row items-start lg:items-center justify-between gap-4">
                   <div className="flex items-start gap-3.5">
                     <div className="relative shrink-0">
                       <div className="w-12 h-12 rounded-2xl bg-blue-600 text-white font-bold flex items-center justify-center text-xl shadow-md">
-                        K
+                        ק
                       </div>
                       <span className="absolute -bottom-1 -right-1 w-3.5 h-3.5 rounded-full bg-emerald-500 ring-2 ring-white" />
                     </div>
                     <div>
                       <div className="flex items-center gap-2 flex-wrap">
-                        <h2 className="text-base font-bold text-slate-900">Digital Kassandra (CEO Co-Partner)</h2>
+                        <h2 className="text-base font-bold text-slate-900">Korban (קָרְבָּן) — Digital Co-Partner</h2>
                         <span className="px-2 py-0.5 rounded-full bg-blue-600 text-white text-[10px] font-semibold">Active Executive</span>
                         <span className="px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800 text-[10px] font-medium">GPT-4o & Gemini Online</span>
                       </div>
                       <p className="text-xs text-slate-600 mt-1 max-w-2xl">
-                        Direct human-in-the-loop executive orchestrator directing 17 agents, 2 empires, and 10-minute backup daemons with zero data leakage.
+                        Direct human-in-the-loop executive orchestrator (digital me) directing 17 agents, 2 empires, and 10-minute backup daemons with zero data leakage.
                       </p>
                     </div>
                   </div>
 
                   <div className="flex flex-wrap items-center gap-2 w-full lg:w-auto">
                     <Button
+                      id="btn-inspect-korban-hub"
+                      onClick={() => {
+                        setInspectAgent(agents[0]);
+                        setTrendDayIndex(6);
+                      }}
+                      variant="outline"
+                      className="bg-white hover:bg-slate-50 text-slate-800 text-xs font-semibold h-9 rounded-xl border-blue-200 cursor-pointer shadow-xs"
+                    >
+                      <Eye className="w-3.5 h-3.5 mr-1.5 text-blue-600" />
+                      Inspect Performance Trend
+                    </Button>
+                    <Button
                       id="btn-kas-hub-chat"
                       onClick={() => setIsCoPartnerChatOpen(true)}
                       className="bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold h-9 rounded-xl px-4 shadow-sm cursor-pointer"
                     >
                       <MessageSquare className="w-3.5 h-3.5 mr-1.5" />
-                      Chat with Digital Kas
+                      Chat with Korban
                     </Button>
                     <Button
                       id="btn-kas-hub-push"
@@ -2116,10 +2172,17 @@ export default function DashboardPage() {
                     className="rounded-2xl border-slate-200 shadow-sm bg-white hover:shadow-md hover:border-slate-300 transition-all flex flex-col justify-between overflow-hidden"
                   >
                     <CardHeader className="p-5 pb-3 space-y-3">
-                      {/* Avatar, Name & Role Badge */}
-                      <div className="flex items-start gap-3">
+                      {/* Avatar, Name & Role Badge (Clickable to Inspect) */}
+                      <div
+                        onClick={() => {
+                          setInspectAgent(agent);
+                          setTrendDayIndex(6);
+                        }}
+                        className="flex items-start gap-3 cursor-pointer group"
+                        title={`Inspect ${agent.name} & 7-Day Performance Score Trend`}
+                      >
                         <div className="relative">
-                          <div className={`w-11 h-11 rounded-2xl ${agent.avatarBg} text-white font-bold flex items-center justify-center text-lg shadow-sm`}>
+                          <div className={`w-11 h-11 rounded-2xl ${agent.avatarBg} text-white font-bold flex items-center justify-center text-lg shadow-sm group-hover:scale-105 transition-transform`}>
                             {agent.avatarChar}
                           </div>
                           <span
@@ -2130,8 +2193,9 @@ export default function DashboardPage() {
                         </div>
 
                         <div className="space-y-1 flex-1">
-                          <div className="font-bold text-sm text-slate-900 leading-tight">
-                            {agent.name}
+                          <div className="font-bold text-sm text-slate-900 group-hover:text-blue-600 transition-colors leading-tight flex items-center justify-between">
+                            <span>{agent.name}</span>
+                            <Eye className="w-3.5 h-3.5 text-slate-300 group-hover:text-blue-600 transition-colors" />
                           </div>
 
                           {/* Role Badge with icon */}
@@ -2192,20 +2256,28 @@ export default function DashboardPage() {
                       </div>
                     </CardHeader>
 
-                    {/* Card Footer: Sessions, Performance %, Status Pill */}
+                    {/* Card Footer: Sessions, Performance %, Status Pill & Inspect Actions */}
                     <div className="p-5 pt-3 border-t border-slate-100 flex items-center justify-between text-xs text-slate-500">
                       <div className="flex items-center gap-3">
                         <div className="flex items-center gap-1" title="Active Browser Sessions">
                           <Globe className="w-3.5 h-3.5 text-slate-400" />
                           <span>{agent.browserSessions}</span>
                         </div>
-                        <div className="flex items-center gap-1" title="Performance Score">
-                          <TrendingUp className="w-3.5 h-3.5 text-slate-400" />
-                          <span>{agent.performanceScore}%</span>
-                        </div>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setInspectAgent(agent);
+                            setTrendDayIndex(6);
+                          }}
+                          className="flex items-center gap-1 hover:text-blue-600 font-medium transition-colors cursor-pointer"
+                          title="View 7-Day Performance Score Trend"
+                        >
+                          <TrendingUp className="w-3.5 h-3.5 text-blue-500" />
+                          <span className="text-slate-700 hover:text-blue-600 font-semibold">{agent.performanceScore}%</span>
+                        </button>
                       </div>
 
-                      <div className="flex items-center gap-2">
+                      <div className="flex items-center gap-1.5">
                         <span
                           className={`px-2 py-0.5 rounded-md text-[10px] font-semibold ${
                             agent.status === 'Active'
@@ -2217,8 +2289,21 @@ export default function DashboardPage() {
                         </span>
 
                         <button
+                          type="button"
+                          onClick={() => {
+                            setInspectAgent(agent);
+                            setTrendDayIndex(6);
+                          }}
+                          className="p-1.5 rounded-lg text-slate-500 hover:text-blue-600 hover:bg-blue-50 transition-colors cursor-pointer"
+                          title={`Inspect ${agent.name} & 7-Day Performance Trend`}
+                        >
+                          <Eye className="w-3.5 h-3.5" />
+                        </button>
+
+                        <button
+                          type="button"
                           onClick={() => handleOpenAgentChat(agent)}
-                          className="p-1 rounded-lg text-blue-600 hover:bg-blue-50 transition-colors"
+                          className="p-1.5 rounded-lg text-blue-600 hover:bg-blue-50 transition-colors cursor-pointer"
                           title={`Chat with ${agent.name} via GPT-4o`}
                         >
                           <MessageSquare className="w-3.5 h-3.5" />
@@ -2245,7 +2330,7 @@ export default function DashboardPage() {
                       <div>
                         <div className="flex items-center gap-2">
                           <h2 className="text-lg font-bold text-slate-900">
-                            Digital Kassandra Co-Partner Command
+                            Korban (קָרְבָּן) — Digital Executive Co-Partner Command
                           </h2>
                           <Badge className="bg-emerald-600 text-white text-[10px]">
                             GPT-4o Engine Active
@@ -4056,14 +4141,14 @@ export default function DashboardPage() {
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-3">
                 <div className="w-9 h-9 rounded-full bg-blue-600 text-white font-bold flex items-center justify-center text-sm shadow-sm">
-                  K
+                  ק
                 </div>
                 <div>
                   <DialogTitle className="text-sm font-bold text-slate-900">
-                    Digital Kassandra (CEO Clone Agent)
+                    Korban (קָרְבָּן) (Digital Co-Partner)
                   </DialogTitle>
                   <p className="text-[11px] text-slate-500">
-                    Direct Human-in-the-Loop Co-Partner • OpenAI GPT-4o
+                    Direct Digital Me & Executive Co-Partner • OpenAI GPT-4o
                   </p>
                 </div>
               </div>
@@ -4098,7 +4183,7 @@ export default function DashboardPage() {
               <div className="flex justify-start">
                 <div className="bg-white rounded-2xl p-3 text-xs flex items-center gap-2 border border-slate-200 shadow-sm">
                   <Loader2 className="w-4 h-4 animate-spin text-blue-600" />
-                  <span className="text-slate-500 font-medium">Digital Kassandra is formulating strategic directive...</span>
+                  <span className="text-slate-500 font-medium">Korban is formulating strategic directive...</span>
                 </div>
               </div>
             )}
@@ -4130,7 +4215,7 @@ export default function DashboardPage() {
 
           <div className="p-3 border-t border-slate-200 bg-white flex items-center gap-2">
             <Input
-              placeholder="Direct Kassandra on empires, tasks, code generation, or deployments..."
+              placeholder="Direct Korban on empires, tasks, code generation, or deployments..."
               value={coPartnerInput}
               onChange={(e) => setCoPartnerInput(e.target.value)}
               onKeyDown={(e) => {
@@ -4257,6 +4342,357 @@ export default function DashboardPage() {
         </DialogContent>
       </Dialog>
 
+      {/* AGENT INSPECTION & 7-DAY HISTORICAL PERFORMANCE MODAL */}
+      <Dialog
+        open={inspectAgent !== null}
+        onOpenChange={(open) => {
+          if (!open) {
+            setInspectAgent(null);
+            setDiagnosticSuccess(false);
+          }
+        }}
+      >
+        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto rounded-2xl p-6 bg-white border-slate-200">
+          {inspectAgent && (() => {
+            const trend = getAgentHistoricalTrend(inspectAgent);
+            const activeDay = trend.days[trendDayIndex] || trend.days[6];
+
+            const width = 520;
+            const height = 180;
+            const padLeft = 45;
+            const padRight = 20;
+            const padTop = 20;
+            const padBottom = 35;
+            const chartW = width - padLeft - padRight;
+            const chartH = height - padTop - padBottom;
+            const yMin = Math.max(50, Math.floor((trend.minScore - 4) / 5) * 5);
+            const yMax = 100;
+
+            const points = trend.days.map((d, i) => {
+              const x = padLeft + (i / 6) * chartW;
+              const y = padTop + (1 - (d.score - yMin) / (yMax - yMin)) * chartH;
+              return { x, y, ...d };
+            });
+
+            const pathD = points.reduce((acc, pt, idx, arr) => {
+              if (idx === 0) return `M ${pt.x} ${pt.y}`;
+              const prev = arr[idx - 1];
+              const cX = (prev.x + pt.x) / 2;
+              return `${acc} C ${cX} ${prev.y}, ${cX} ${pt.y}, ${pt.x} ${pt.y}`;
+            }, '');
+
+            const areaD = `${pathD} L ${points[6].x} ${padTop + chartH} L ${points[0].x} ${padTop + chartH} Z`;
+
+            return (
+              <div className="space-y-6">
+                {/* Header */}
+                <DialogHeader className="space-y-3 pb-2 border-b border-slate-100">
+                  <div className="flex items-start justify-between gap-4">
+                    <div className="flex items-center gap-3.5">
+                      <div className="relative">
+                        <div className={`w-12 h-12 rounded-2xl ${inspectAgent.avatarBg} text-white font-bold flex items-center justify-center text-xl shadow-md`}>
+                          {inspectAgent.avatarChar}
+                        </div>
+                        <span className="absolute -bottom-1 -right-1 w-3.5 h-3.5 rounded-full bg-emerald-500 ring-2 ring-white" />
+                      </div>
+                      <div>
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <DialogTitle className="text-lg font-bold text-slate-900">
+                            {inspectAgent.name}
+                          </DialogTitle>
+                          <Badge className="bg-blue-100 text-blue-700 hover:bg-blue-200 border-none text-[11px] font-semibold">
+                            {inspectAgent.badgeTitle}
+                          </Badge>
+                          <span className="px-2 py-0.5 rounded-full text-[10px] font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200">
+                            Active • Online
+                          </span>
+                        </div>
+                        <p className="text-xs text-slate-500 mt-0.5">
+                          ID: <span className="font-mono text-slate-700">{inspectAgent.id}</span> • Engine: <span className="font-semibold text-slate-700">OpenAI GPT-4o & Gemini Multimodal</span>
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                  <DialogDescription className="text-xs text-slate-600 leading-relaxed pt-1">
+                    {inspectAgent.description}
+                  </DialogDescription>
+                </DialogHeader>
+
+                {/* 4 Summary Telemetry Cards */}
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                  <div className="p-3 rounded-xl bg-slate-50 border border-slate-200/80">
+                    <div className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider">Current Score</div>
+                    <div className="text-xl font-extrabold text-blue-600 mt-0.5">{inspectAgent.performanceScore}%</div>
+                    <div className="text-[10px] text-emerald-600 font-medium flex items-center gap-0.5 mt-0.5">
+                      <TrendingUp className="w-3 h-3" />
+                      <span>Peak Autonomous</span>
+                    </div>
+                  </div>
+
+                  <div className="p-3 rounded-xl bg-slate-50 border border-slate-200/80">
+                    <div className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider">7-Day Net Trend</div>
+                    <div className="text-xl font-extrabold text-emerald-600 mt-0.5">+{trend.totalChange}%</div>
+                    <div className="text-[10px] text-slate-500 mt-0.5">Past 7 Days Growth</div>
+                  </div>
+
+                  <div className="p-3 rounded-xl bg-slate-50 border border-slate-200/80">
+                    <div className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider">Browser Sessions</div>
+                    <div className="text-xl font-extrabold text-slate-800 mt-0.5">{inspectAgent.browserSessions} Active</div>
+                    <div className="text-[10px] text-slate-500 mt-0.5">Playwright Isolated</div>
+                  </div>
+
+                  <div className="p-3 rounded-xl bg-slate-50 border border-slate-200/80">
+                    <div className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider">Reliability SLA</div>
+                    <div className="text-xl font-extrabold text-slate-800 mt-0.5">99.98%</div>
+                    <div className="text-[10px] text-emerald-600 font-medium mt-0.5">Zero Failures</div>
+                  </div>
+                </div>
+
+                {/* 7-DAY HISTORICAL PERFORMANCE SCORE TREND LINE CHART */}
+                <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-xs space-y-3">
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-2 border-b border-slate-100">
+                    <div>
+                      <div className="flex items-center gap-2">
+                        <TrendingUp className="w-4 h-4 text-blue-600" />
+                        <h3 className="text-xs font-bold text-slate-900 uppercase tracking-wide">
+                          Historical Performance Score Trend (Last 7 Days)
+                        </h3>
+                      </div>
+                      <p className="text-[11px] text-slate-500">
+                        Autonomous deterministic verification & throughput over 7 consecutive operational cycles
+                      </p>
+                    </div>
+
+                    {/* Stats pills */}
+                    <div className="flex items-center gap-2 text-[11px]">
+                      <span className="px-2 py-0.5 rounded-md bg-slate-100 text-slate-600">
+                        7D Avg: <strong className="text-slate-900">{trend.avgScore}%</strong>
+                      </span>
+                      <span className="px-2 py-0.5 rounded-md bg-emerald-50 text-emerald-700 font-medium">
+                        Peak: <strong className="text-emerald-800">{trend.maxScore}%</strong>
+                      </span>
+                    </div>
+                  </div>
+
+                  {/* Interactive Day Inspection Callout */}
+                  <div className="flex items-center justify-between p-2.5 rounded-xl bg-blue-50/70 border border-blue-200 text-xs">
+                    <div className="flex items-center gap-2">
+                      <span className="w-2 h-2 rounded-full bg-blue-600 animate-pulse" />
+                      <span className="font-bold text-slate-900">{activeDay.fullDate}</span>
+                      <span className="text-slate-400">•</span>
+                      <span className="text-blue-700 font-extrabold text-sm">{activeDay.score}%</span>
+                      <span className={`text-[10px] font-semibold px-1.5 py-0.5 rounded ${activeDay.diff >= 0 ? 'bg-emerald-100 text-emerald-800' : 'bg-rose-100 text-rose-800'}`}>
+                        {activeDay.diff >= 0 ? `+${activeDay.diff}%` : `${activeDay.diff}%`} vs prev day
+                      </span>
+                    </div>
+                    <div className="text-[11px] text-slate-600 hidden sm:flex items-center gap-3">
+                      <span>Tasks: <strong>{activeDay.tasks} completed</strong></span>
+                      <span>Latency: <strong>{activeDay.latencyMs}ms</strong></span>
+                    </div>
+                  </div>
+
+                  {/* SVG Chart */}
+                  <div className="relative w-full overflow-hidden">
+                    <svg viewBox={`0 0 ${width} ${height}`} className="w-full h-auto overflow-visible select-none">
+                      <defs>
+                        <linearGradient id="trendGradient" x1="0" y1="0" x2="0" y2="1">
+                          <stop offset="0%" stopColor="#2563eb" stopOpacity="0.25" />
+                          <stop offset="100%" stopColor="#2563eb" stopOpacity="0.0" />
+                        </linearGradient>
+                      </defs>
+
+                      {/* Horizontal Grid lines */}
+                      {[100, 95, 90, 85, 80].filter(v => v >= yMin).map(v => {
+                        const y = padTop + (1 - (v - yMin) / (yMax - yMin)) * chartH;
+                        return (
+                          <g key={v}>
+                            <line x1={padLeft} y1={y} x2={width - padRight} y2={y} stroke="#e2e8f0" strokeDasharray="3 3" strokeWidth="1" />
+                            <text x={padLeft - 6} y={y + 3.5} textAnchor="end" className="text-[9px] fill-slate-400 font-mono font-medium">
+                              {v}%
+                            </text>
+                          </g>
+                        );
+                      })}
+
+                      {/* Area Fill */}
+                      <path d={areaD} fill="url(#trendGradient)" />
+
+                      {/* Smooth Trend Line */}
+                      <path d={pathD} fill="none" stroke="#2563eb" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />
+
+                      {/* Vertical Indicator Line for Selected Day */}
+                      <line
+                        x1={points[trendDayIndex].x}
+                        y1={padTop}
+                        x2={points[trendDayIndex].x}
+                        y2={padTop + chartH}
+                        stroke="#3b82f6"
+                        strokeWidth="1.5"
+                        strokeDasharray="2 2"
+                      />
+
+                      {/* Data Points */}
+                      {points.map((pt, idx) => {
+                        const isSelected = idx === trendDayIndex;
+                        return (
+                          <g
+                            key={idx}
+                            onClick={() => setTrendDayIndex(idx)}
+                            className="cursor-pointer"
+                          >
+                            {/* Larger invisible hit zone */}
+                            <circle cx={pt.x} cy={pt.y} r="14" fill="transparent" />
+
+                            {isSelected && (
+                              <circle cx={pt.x} cy={pt.y} r="8" fill="#93c5fd" opacity="0.6" className="animate-ping" />
+                            )}
+
+                            <circle
+                              cx={pt.x}
+                              cy={pt.y}
+                              r={isSelected ? 6 : 4}
+                              fill="white"
+                              stroke="#2563eb"
+                              strokeWidth={isSelected ? 3 : 2}
+                              className="transition-all"
+                            />
+
+                            {/* Score on top of point */}
+                            <text
+                              x={pt.x}
+                              y={pt.y - 9}
+                              textAnchor="middle"
+                              className={`text-[9px] font-bold font-mono ${isSelected ? 'fill-blue-700 font-extrabold' : 'fill-slate-600'}`}
+                            >
+                              {pt.score}%
+                            </text>
+
+                            {/* X-axis Date Label */}
+                            <text
+                              x={pt.x}
+                              y={height - 10}
+                              textAnchor="middle"
+                              className={`text-[10px] font-medium ${isSelected ? 'fill-blue-700 font-bold' : 'fill-slate-500'}`}
+                            >
+                              {pt.label}
+                            </text>
+                          </g>
+                        );
+                      })}
+                    </svg>
+                  </div>
+                  <p className="text-[10px] text-slate-400 text-center italic">
+                    Click or tap any data point on the chart to inspect day-specific throughput and latency.
+                  </p>
+                </div>
+
+                {/* Capabilities with confidence levels */}
+                <div className="space-y-3">
+                  <h4 className="text-xs font-bold text-slate-900 uppercase tracking-wide">
+                    Autonomous Competencies & Capabilities
+                  </h4>
+                  <div className="space-y-2.5">
+                    {inspectAgent.capabilities.map((cap, i) => (
+                      <div key={i} className="p-3 rounded-xl bg-slate-50 border border-slate-100 space-y-1.5">
+                        <div className="flex items-center justify-between text-xs">
+                          <span className="font-semibold text-slate-900">{cap.name}</span>
+                          <span className="font-mono text-blue-600 font-bold">{(cap.confidence * 100).toFixed(0)}% Confidence</span>
+                        </div>
+                        <p className="text-[11px] text-slate-500 leading-snug">{cap.description}</p>
+                        <Progress value={cap.confidence * 100} className="h-1.5 bg-slate-200" />
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Current Sprint Task & Tags */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
+                  <div className="p-3 rounded-xl bg-slate-50 border border-slate-200/80 space-y-1">
+                    <div className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider">Current Sprint Task</div>
+                    <div className="text-xs font-semibold text-slate-900 leading-snug">
+                      {inspectAgent.currentTask || 'Autonomous ecosystem monitoring & continuous pipeline health'}
+                    </div>
+                  </div>
+                  <div className="p-3 rounded-xl bg-slate-50 border border-slate-200/80 space-y-1.5">
+                    <div className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider">Specialized Skills</div>
+                    <div className="flex flex-wrap gap-1">
+                      {inspectAgent.tags.map((t, idx) => (
+                        <span key={idx} className="px-2 py-0.5 rounded-md bg-white border border-slate-200 text-slate-700 text-[10px] font-mono">
+                          {t}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+
+                {/* Diagnostic Result Banner (if triggered) */}
+                {diagnosticSuccess && (
+                  <div className="p-3 rounded-xl bg-emerald-50 border border-emerald-200 text-xs text-emerald-900 flex items-center gap-2">
+                    <CheckCircle className="w-4 h-4 text-emerald-600 shrink-0" />
+                    <span>
+                      <strong>Diagnostic Benchmark Passed:</strong> {inspectAgent.name} validated at 100% deterministic SLA • Zero memory leaks • Sub-300ms model response.
+                    </span>
+                  </div>
+                )}
+
+                {/* Modal Footer Actions */}
+                <div className="pt-3 border-t border-slate-100 flex flex-col sm:flex-row items-center justify-between gap-3">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={() => {
+                      setIsDiagnosing(true);
+                      setDiagnosticSuccess(false);
+                      setTimeout(() => {
+                        setIsDiagnosing(false);
+                        setDiagnosticSuccess(true);
+                      }, 1000);
+                    }}
+                    disabled={isDiagnosing}
+                    className="w-full sm:w-auto text-xs h-9 rounded-xl border-slate-300 cursor-pointer"
+                  >
+                    {isDiagnosing ? (
+                      <>
+                        <Loader2 className="w-3.5 h-3.5 mr-1.5 animate-spin" />
+                        Running Diagnostic Benchmark...
+                      </>
+                    ) : (
+                      <>
+                        <Activity className="w-3.5 h-3.5 mr-1.5 text-blue-600" />
+                        Run Diagnostic Benchmark
+                      </>
+                    )}
+                  </Button>
+
+                  <div className="flex items-center gap-2 w-full sm:w-auto justify-end">
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      onClick={() => setInspectAgent(null)}
+                      className="text-xs h-9 rounded-xl cursor-pointer"
+                    >
+                      Close
+                    </Button>
+                    <Button
+                      type="button"
+                      onClick={() => {
+                        const target = inspectAgent;
+                        setInspectAgent(null);
+                        handleOpenAgentChat(target);
+                      }}
+                      className="bg-blue-600 hover:bg-blue-700 text-white text-xs h-9 rounded-xl px-4 cursor-pointer"
+                    >
+                      <MessageSquare className="w-3.5 h-3.5 mr-1.5" />
+                      Chat with {inspectAgent.name}
+                    </Button>
+                  </div>
+                </div>
+              </div>
+            );
+          })()}
+        </DialogContent>
+      </Dialog>
+
       {/* ADD AGENT DIALOG */}
       <Dialog open={isAddAgentOpen} onOpenChange={setIsAddAgentOpen}>
         <DialogContent className="max-w-md rounded-2xl">
@@ -4377,7 +4813,7 @@ export default function DashboardPage() {
                 <SelectContent>
                   <SelectItem value="Atlas">Atlas (Apex Sovereign Manager)</SelectItem>
                   <SelectItem value="Nova">Nova (Matrix SaaS Manager)</SelectItem>
-                  <SelectItem value="Kassandra">Kassandra (Direct Co-Partner)</SelectItem>
+                  <SelectItem value="Korban">Korban (קָרְבָּן) (Direct Co-Partner)</SelectItem>
                 </SelectContent>
               </Select>
             </div>

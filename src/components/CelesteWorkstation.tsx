@@ -140,10 +140,10 @@ export const CelesteWorkstation: React.FC<CelesteProps> = ({
   const [activeModule, setActiveModule] = useState<CelesteModule>('chat');
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
   const [chatMode, setChatMode] = useState<'agent' | 'chat'>('chat');
-  const [selectedModel, setSelectedModel] = useState<'gpt-4o' | 'gemini-2.5-flash' | 'claude-3.5' | 'deepseek-r1' | 'celeste-sovereign'>('gpt-4o');
+  const [selectedModel, setSelectedModel] = useState<'gpt-4o' | 'gemini-2.5-flash' | 'claude-3.5' | 'deepseek-r1' | 'kommandra-sovereign' | 'celeste-sovereign'>('gpt-4o');
   const [isModelDropdownOpen, setIsModelDropdownOpen] = useState(false);
   const [isAudienceDropdownOpen, setIsAudienceDropdownOpen] = useState(false);
-  const [selectedAudience, setSelectedAudience] = useState<string>('Digital Kassandra');
+  const [selectedAudience, setSelectedAudience] = useState<string>('Korban (קָרְבָּן)');
   const [isWebSearchEnabled, setIsWebSearchEnabled] = useState(false);
   const [isSetupModalOpen, setIsSetupModalOpen] = useState(false);
   const [copiedKey, setCopiedKey] = useState<string | null>(null);
@@ -271,11 +271,11 @@ export const CelesteWorkstation: React.FC<CelesteProps> = ({
   const emails: EmailItem[] = [
     {
       id: 'mail-1',
-      sender: 'Celeste Daemon <daemon@celeste.sovereign>',
+      sender: 'KOMMANDRA Daemon <daemon@kommandra.sovereign>',
       recipient: 'theaucklandassistant@gmail.com',
       subject: '📦 Automated Git Snapshot & Source Archive Export',
       preview: 'Continuous 10-minute sovereign daemon has packaged latest state: 4 repositories synced, 17 agents active.',
-      body: `Hello Kassandra,\n\nYour autonomous Celeste 10-minute snapshot daemon has successfully executed:\n\n- Timestamp: ${new Date().toISOString()}\n- Repositories: Apex Sovereign Capital, Matrix SaaS Forge, Sovereign Enclave\n- Workforce Health: 17/17 Agents Operational\n- Backup Archive: Packed & Encrypted (AES-256)\n\nAll continuous pipelines remain 100% active and autonomous.`,
+      body: `Hello Kassandra,\n\nYour autonomous KOMMANDRA 10-minute snapshot daemon has successfully executed:\n\n- Timestamp: ${new Date().toISOString()}\n- Repositories: Apex Sovereign Capital, Matrix SaaS Forge, Sovereign Enclave\n- Workforce Health: 17/17 Agents Operational\n- Backup Archive: Packed & Encrypted (AES-256)\n\nAll continuous pipelines remain 100% active and autonomous.`,
       timestamp: '5m ago',
       unread: true,
       type: 'system',
@@ -333,9 +333,9 @@ export const CelesteWorkstation: React.FC<CelesteProps> = ({
         {
           id: `resp-${Date.now()}`,
           role: 'assistant',
-          content: '🌸 Celeste Sovereign Daemon triggered: Instant GitHub push dispatched across Apex Sovereign Capital and Matrix SaaS Forge repositories.',
+          content: '🌸 KOMMANDRA Sovereign Daemon triggered: Instant GitHub push dispatched across Apex Sovereign Capital and Matrix SaaS Forge repositories.',
           timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-          model: 'Celeste Daemon'
+          model: 'KOMMANDRA Daemon'
         }
       ]);
       return;
@@ -355,9 +355,9 @@ export const CelesteWorkstation: React.FC<CelesteProps> = ({
         {
           id: `resp-${Date.now()}`,
           role: 'assistant',
-          content: '📦 Encrypted Celeste backup archive created and dispatched to theaucklandassistant@gmail.com.',
+          content: '📦 Encrypted KOMMANDRA backup archive created and dispatched to theaucklandassistant@gmail.com.',
           timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-          model: 'Celeste Backup'
+          model: 'KOMMANDRA Backup'
         }
       ]);
       return;
@@ -408,12 +408,12 @@ export const CelesteWorkstation: React.FC<CelesteProps> = ({
           agentName: selectedAudience,
           message: textToSend,
           conversationHistory: messages.slice(-6).map(m => ({ role: m.role, content: m.content })),
-          context: `You are Celeste / Digital Kassandra (CEO Clone), directing 17 autonomous agents, 2 empires, and 10-minute backup pipelines with a dreamy soft aesthetic and ruthless operational functionality. Model: ${selectedModel}. Mode: ${chatMode}. Provide sharp, tactical, elegant, and sovereign directives.`
+          context: `You are KOMMANDRA / Korban (קָרְבָּן) (CEO Clone), directing 17 autonomous agents, 2 empires, and 10-minute backup pipelines with a dreamy soft aesthetic and ruthless operational functionality. Model: ${selectedModel}. Mode: ${chatMode}. Provide sharp, tactical, elegant, and sovereign directives.`
         })
       });
 
       const data = await response.json();
-      const assistantText = data.text || 'Directive acknowledged and synchronized across the sovereign Celeste workforce.';
+      const assistantText = data.text || 'Directive acknowledged and synchronized across the sovereign KOMMANDRA workforce.';
 
       setMessages(prev => [
         ...prev,
@@ -426,15 +426,15 @@ export const CelesteWorkstation: React.FC<CelesteProps> = ({
         }
       ]);
     } catch (err) {
-      console.error('Error communicating with Celeste:', err);
+      console.error('Error communicating with KOMMANDRA:', err);
       setMessages(prev => [
         ...prev,
         {
           id: `err-${Date.now()}`,
           role: 'assistant',
-          content: `🌸 Directive synchronized with Celeste Sovereign Engine: "${textToSend}". All 17 agents, 10-minute GitHub backup daemons, and revenue pipelines remain 100% operational.`,
+          content: `🌸 Directive synchronized with KOMMANDRA Sovereign Engine: "${textToSend}". All 17 agents, 10-minute GitHub backup daemons, and revenue pipelines remain 100% operational.`,
           timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-          model: 'Celeste Engine'
+          model: 'KOMMANDRA Engine'
         }
       ]);
     } finally {
@@ -454,7 +454,7 @@ export const CelesteWorkstation: React.FC<CelesteProps> = ({
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           agentRole: 'executive',
-          agentName: 'Celeste Deep Research Agent',
+          agentName: 'KOMMANDRA Deep Research Agent',
           message: `Conduct an exhaustive, ruthlessly functional deep research dossier on: "${researchTopic}". Include: 1. Executive Summary & Market Size, 2. Competitor Weaknesses & Pricing Gaps, 3. Exact 48-Hour Execution Blueprint, 4. High-Margin Monetization Strategy ($500-$5,000/mo).`,
           context: 'Deep Research Agent. Produce a structured, elite, actionable market intelligence dossier.'
         })
@@ -539,7 +539,7 @@ export const CelesteWorkstation: React.FC<CelesteProps> = ({
     const newTask: TaskItem = {
       id: `task-${Date.now()}`,
       title: newTaskTitle,
-      description: 'Autonomous directive generated from Celeste Workstation.',
+      description: 'Autonomous directive generated from KOMMANDRA Workstation.',
       assignedAgent: newTaskAgent,
       status: 'in-progress',
       priority: newTaskPriority,
@@ -590,7 +590,7 @@ export const CelesteWorkstation: React.FC<CelesteProps> = ({
                   ✦
                 </div>
                 <span className="font-semibold text-sm tracking-tight bg-gradient-to-r from-pink-300 via-rose-200 to-sky-200 bg-clip-text text-transparent">
-                  Celeste
+                  KOMMANDRA
                 </span>
                 <span className="text-[10px] font-mono px-1.5 py-0.5 rounded-full bg-pink-500/10 text-pink-300 border border-pink-500/20">
                   Sovereign
@@ -811,7 +811,7 @@ export const CelesteWorkstation: React.FC<CelesteProps> = ({
           <button
             onClick={() => setIsSetupModalOpen(true)}
             className="p-2 rounded-xl text-slate-400 hover:text-pink-300 hover:bg-slate-800/60 transition-colors cursor-pointer"
-            title="Celeste Configuration & Setup"
+            title="KOMMANDRA Configuration & Setup"
           >
             <Settings className="w-4 h-4" />
           </button>
@@ -851,12 +851,12 @@ export const CelesteWorkstation: React.FC<CelesteProps> = ({
                 {isAudienceDropdownOpen && (
                   <div className="absolute top-full mt-1.5 left-1/2 -translate-x-1/2 w-64 bg-[#111626] border border-pink-500/20 rounded-2xl shadow-2xl py-1.5 z-50 text-xs backdrop-blur-md">
                     {[
-                      'Digital Kassandra',
+                      'Korban (קָרְבָּן) (Digital Co-Partner)',
                       'Vanguard (Sales Lead)',
                       'Gem-Miner (Scrap Recycler)',
                       'Forecaster-12h',
                       'Moat-Council',
-                      'Celeste Chief of Staff',
+                      'KOMMANDRA Chief of Staff',
                       'Sovereign Enclave'
                     ].map(agent => (
                       <button
@@ -931,7 +931,7 @@ export const CelesteWorkstation: React.FC<CelesteProps> = ({
                 {/* Title */}
                 <div className="space-y-1">
                   <h1 className="text-3xl font-light tracking-tight bg-gradient-to-r from-pink-200 via-rose-100 to-sky-200 bg-clip-text text-transparent">
-                    Celeste
+                    KOMMANDRA
                   </h1>
                   <p className="text-xs text-slate-400 font-mono">
                     Dreamy Soft Aesthetic • Ruthlessly Functional
@@ -1005,7 +1005,7 @@ export const CelesteWorkstation: React.FC<CelesteProps> = ({
                       }`}
                     >
                       <div className="flex items-center justify-between gap-4 text-[10px] text-slate-400 border-b border-slate-800 pb-1.5">
-                        <span className="font-mono text-pink-300">{msg.role === 'user' ? 'Kassandra (CEO)' : msg.model || 'Celeste Sovereign'}</span>
+                        <span className="font-mono text-pink-300">{msg.role === 'user' ? 'Kassandra (CEO)' : msg.model || 'KOMMANDRA Sovereign'}</span>
                         <span>{msg.timestamp}</span>
                       </div>
 
@@ -1022,7 +1022,7 @@ export const CelesteWorkstation: React.FC<CelesteProps> = ({
                       <Loader2 className="w-4 h-4 animate-spin" />
                     </div>
                     <div className="p-3.5 rounded-2xl bg-[#121727]/90 border border-slate-700/80 text-xs text-pink-200 flex items-center gap-2">
-                      <span>Synthesizing autonomous Celeste directive across 17 agents...</span>
+                      <span>Synthesizing autonomous KOMMANDRA directive across 17 agents...</span>
                     </div>
                   </div>
                 )}
@@ -1057,7 +1057,7 @@ export const CelesteWorkstation: React.FC<CelesteProps> = ({
                           { id: 'gemini-2.5-flash', label: 'Gemini 2.5 Flash' },
                           { id: 'claude-3.5', label: 'Claude 3.5 Sonnet' },
                           { id: 'deepseek-r1', label: 'DeepSeek-R1' },
-                          { id: 'celeste-sovereign', label: 'Celeste Sovereign' }
+                          { id: 'kommandra-sovereign', label: 'KOMMANDRA Sovereign' }
                         ].map(m => (
                           <button
                             key={m.id}
@@ -1829,7 +1829,7 @@ export const CelesteWorkstation: React.FC<CelesteProps> = ({
 
             <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
               {[
-                { title: 'Celeste Workstation UI', tag: 'Aesthetic Interface', gradient: 'from-pink-500/30 to-purple-600/30' },
+                { title: 'KOMMANDRA Workstation UI', tag: 'Aesthetic Interface', gradient: 'from-pink-500/30 to-purple-600/30' },
                 { title: 'Apex Capital Invoice Flow', tag: 'Stripe SaaS', gradient: 'from-sky-500/30 to-blue-600/30' },
                 { title: 'Matrix Scrap Miner Terminal', tag: 'DevOps Tool', gradient: 'from-amber-500/30 to-rose-600/30' },
                 { title: 'Vanguard Outbound Teaser', tag: 'Video Asset', gradient: 'from-emerald-500/30 to-teal-600/30' },
@@ -2086,7 +2086,7 @@ export const CelesteWorkstation: React.FC<CelesteProps> = ({
                 </div>
                 <div>
                   <h3 className="text-sm font-bold text-white flex items-center gap-2">
-                    <span>Celeste Sovereign Configuration</span>
+                    <span>KOMMANDRA Sovereign Configuration</span>
                     <span className="px-2 py-0.5 rounded-full bg-pink-500/10 text-pink-300 text-[10px] font-semibold border border-pink-500/20">
                       Ready
                     </span>
@@ -2160,3 +2160,6 @@ export const CelesteWorkstation: React.FC<CelesteProps> = ({
     </div>
   );
 };
+
+export const KommandraWorkstation = CelesteWorkstation;
+export type KommandraProps = CelesteProps;

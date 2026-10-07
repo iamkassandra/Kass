@@ -26,7 +26,7 @@ export function AuthWrapper({ children }: AuthWrapperProps) {
 
   // Define protected routes that require authentication
   const protectedRoutes = ['/dashboard', '/demo'];
-  const isProtectedRoute = protectedRoutes.some(route => pathname.startsWith(route));
+  const isProtectedRoute = Boolean(pathname && protectedRoutes.some(route => pathname.startsWith(route)));
 
   useEffect(() => {
     let isMounted = true;
