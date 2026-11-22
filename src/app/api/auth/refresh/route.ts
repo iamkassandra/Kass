@@ -29,7 +29,14 @@ export async function POST(request: NextRequest) {
       response.cookies.set('refresh_token', '', {
         httpOnly: true,
         secure: process.env.NODE_ENV === 'production',
-        sameSite: 'strict',
+        sameSite: 'lax',
+        maxAge: 0,
+        path: '/'
+      });
+      response.cookies.set('auth_token', '', {
+        httpOnly: true,
+        secure: process.env.NODE_ENV === 'production',
+        sameSite: 'lax',
         maxAge: 0,
         path: '/'
       });
@@ -45,11 +52,19 @@ export async function POST(request: NextRequest) {
       message: result.message
     });
 
+    response.cookies.set('auth_token', result.token!, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: 'lax',
+      maxAge: 24 * 60 * 60, // 24 hours
+      path: '/'
+    });
+
     // Update refresh token cookie
     response.cookies.set('refresh_token', result.refreshToken!, {
       httpOnly: true,
       secure: process.env.NODE_ENV === 'production',
-      sameSite: 'strict',
+      sameSite: 'lax',
       maxAge: 30 * 24 * 60 * 60, // 30 days
       path: '/'
     });

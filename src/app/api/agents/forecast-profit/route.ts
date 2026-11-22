@@ -1,34 +1,50 @@
-import { NextRequest, NextResponse } from 'next/server';
-import { openAIService, OPENAI_MODEL } from '@/lib/services/OpenAIService';
+import { NextResponse } from 'next/server';
+import { withAuth, AuthenticatedRequest } from '@/middleware/auth';
+import { openAIService } from '@/lib/services/OpenAIService';
 
-export async function POST(req: NextRequest) {
+export const POST = withAuth(async (req: AuthenticatedRequest) => {
   try {
     const body = await req.json();
-    const { opportunityName, niche, pricingModel } = body;
+    const opportunityName = String(body?.opportunityName || '').trim();
+    const targetNiche = String(
+      body?.targetNiche || body?.niche || 'Digital Automation / Micro-SaaS'
+    ).trim();
+    const pricingModel = String(
+      body?.pricingModel || '$79/month Stripe recurring billing'
+    ).trim();
+    const baselineConversionRate = body?.baselineConversionRate
+      ? Number(body.baselineConversionRate)
+      : undefined;
 
     if (!opportunityName) {
-      return NextResponse.json({
-        success: false,
-        error: 'Opportunity name is required.'
-      }, { status: 400 });
+      return NextResponse.json(
+        { success: false, error: 'Opportunity name is required.' },
+        { status: 400 }
+      );
     }
 
-    const forecast = await openAIService.generateRealTalkForecast({
+    const result = await openAIService.generateRealTalkForecast({
       opportunityName,
-      niche: niche || 'Digital Automation / Micro-SaaS',
-      pricingModel: pricingModel || '$79/month Stripe recurring billing'
+      targetNiche,
+      pricingModel,
+      baselineConversionRate,
     });
 
     return NextResponse.json({
       success: true,
-      model: OPENAI_MODEL,
-      forecast
+      model: result.model,
+      result,
     });
   } catch (error: any) {
     console.error('[API /api/agents/forecast-profit] Error:', error);
-    return NextResponse.json({
-      success: false,
-      error: error?.message || 'Failed to generate 12h incremental real-talk forecast'
-    }, { status: 500 });
+    const status = typeof error?.statusCode === 'number' ? error.statusCode : 500;
+    return NextResponse.json(
+      {
+        success: false,
+        code: error?.code || 'FORECAST_ERROR',
+        error: error?.message || 'Failed to generate 12h incremental forecast.',
+      },
+      { status }
+    );
   }
-}
+});

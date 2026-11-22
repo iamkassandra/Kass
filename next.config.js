@@ -1,5 +1,9 @@
+const { PHASE_DEVELOPMENT_SERVER } = require("next/constants");
+
 /** @type {import('next').NextConfig} */
-const nextConfig = {
+module.exports = (phase) => ({
+  distDir: phase === PHASE_DEVELOPMENT_SERVER ? ".next-dev" : ".next",
+  output: "standalone",
   images: {
     unoptimized: true,
     remotePatterns: [
@@ -25,6 +29,4 @@ const nextConfig = {
       },
     ],
   },
-};
-
-module.exports = nextConfig;
+});

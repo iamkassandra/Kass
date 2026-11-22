@@ -1,34 +1,44 @@
-import { NextRequest, NextResponse } from 'next/server';
-import { openAIService, OPENAI_MODEL } from '@/lib/services/OpenAIService';
+import { NextResponse } from 'next/server';
+import { withAuth, AuthenticatedRequest } from '@/middleware/auth';
+import { openAIService } from '@/lib/services/OpenAIService';
 
-export async function POST(req: NextRequest) {
+export const POST = withAuth(async (req: AuthenticatedRequest) => {
   try {
     const body = await req.json();
-    const { inboundType = 'email', rawMessage, sender = 'Client / External API' } = body;
+    const inboundType = String(body?.inboundType || 'inbound_lead').trim();
+    const senderInfo = String(
+      body?.senderInfo || body?.sender || 'Client / External Inquiry'
+    ).trim();
+    const rawMessage = String(body?.rawMessage || '').trim();
 
-    if (!rawMessage || typeof rawMessage !== 'string') {
-      return NextResponse.json({
-        success: false,
-        error: 'Raw inbound message or task is required.'
-      }, { status: 400 });
+    if (!rawMessage) {
+      return NextResponse.json(
+        { success: false, error: 'Raw inbound message or task is required.' },
+        { status: 400 }
+      );
     }
 
     const result = await openAIService.deliberateCouncilTriage({
       inboundType,
+      senderInfo,
       rawMessage,
-      sender
     });
 
     return NextResponse.json({
       success: true,
-      model: OPENAI_MODEL,
-      result
+      model: result.model,
+      result,
     });
   } catch (error: any) {
     console.error('[API /api/agents/council-triage] Error:', error);
-    return NextResponse.json({
-      success: false,
-      error: error?.message || 'Failed to deliberate across AI moat border council'
-    }, { status: 500 });
+    const status = typeof error?.statusCode === 'number' ? error.statusCode : 500;
+    return NextResponse.json(
+      {
+        success: false,
+        code: error?.code || 'COUNCIL_ERROR',
+        error: error?.message || 'Failed to deliberate across AI border council.',
+      },
+      { status }
+    );
   }
-}
+});

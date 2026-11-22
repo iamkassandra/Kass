@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState, useEffect, useRef } from 'react';
+import { authFetch } from '@/lib/client/authFetch';
 import {
   Menu,
   Plus,
@@ -91,7 +92,7 @@ export const OdysseusWorkstation: React.FC<OdysseusProps> = ({
   const [activeModule, setActiveModule] = useState<OdysseusModule>('chat');
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
   const [chatMode, setChatMode] = useState<'agent' | 'chat'>('chat');
-  const [selectedModel, setSelectedModel] = useState<'gpt-4o' | 'gemini-2.5-flash' | 'claude-3.5' | 'deepseek-r1' | 'sovereign'>('gpt-4o');
+  const [selectedModel, setSelectedModel] = useState<'gpt-4o' | 'gemini-4-hydrogen'>('gemini-4-hydrogen');
   const [isModelDropdownOpen, setIsModelDropdownOpen] = useState(false);
   const [isAudienceDropdownOpen, setIsAudienceDropdownOpen] = useState(false);
   const [selectedAudience, setSelectedAudience] = useState<string>('Digital Kassandra');
@@ -212,41 +213,45 @@ export const OdysseusWorkstation: React.FC<OdysseusProps> = ({
     setIsGenerating(true);
 
     try {
-      const response = await fetch('/api/agents/chat', {
+      const response = await authFetch('/api/agents/chat', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           agentRole: chatMode === 'agent' ? 'executive' : 'assistant',
           agentName: selectedAudience,
           message: textToSend,
+          preferredModel: selectedModel,
+          useWebSearch: isWebSearchEnabled,
           conversationHistory: messages.slice(-6).map(m => ({ role: m.role, content: m.content })),
-          context: `You are Odysseus / Digital Kassandra (CEO Clone), directing 17 autonomous agents, 2 empires, and 10-minute backup pipelines. Model: ${selectedModel}. Mode: ${chatMode}. Provide sharp, tactical, and sovereign directives.`
+          context: `You are Digital Kassandra (CEO Clone), directing 17 autonomous agents and profit operations. Mode: ${chatMode}.`
         })
       });
 
-      const data = await response.json();
-      const assistantText = data.text || 'Directive acknowledged and synchronized across the sovereign workforce.';
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok || data.error) {
+        throw new Error(data.error || `HTTP ${response.status} from /api/agents/chat`);
+      }
 
       setMessages(prev => [
         ...prev,
         {
           id: `resp-${Date.now()}`,
           role: 'assistant',
-          content: assistantText,
+          content: data.text,
           timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
           model: data.model || selectedModel
         }
       ]);
-    } catch (err) {
-      console.error('Error communicating with Odysseus:', err);
+    } catch (err: any) {
+      console.error('Error communicating with /api/agents/chat:', err);
       setMessages(prev => [
         ...prev,
         {
           id: `err-${Date.now()}`,
           role: 'assistant',
-          content: `Task directive received: "${textToSend}". Synchronized with local sovereign state engine. All 17 agents, 10-minute GitHub backup daemons, and Stripe checkout pipelines remain operational.`,
+          content: `AI execution error: ${err?.message || 'Unable to reach /api/agents/chat.'}`,
           timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-          model: 'Sovereign Engine'
+          model: 'error'
         }
       ]);
     } finally {
@@ -717,18 +722,15 @@ export const OdysseusWorkstation: React.FC<OdysseusProps> = ({
                     onClick={() => setIsModelDropdownOpen(!isModelDropdownOpen)}
                     className="flex items-center gap-1.5 text-[11px] font-mono text-[#a0a4b2] hover:text-white px-2 py-0.5 rounded-md hover:bg-[#282a35] transition-colors cursor-pointer"
                   >
-                    <span>{selectedModel === 'gpt-4o' ? 'OpenAI GPT-4o' : selectedModel === 'gemini-2.5-flash' ? 'Gemini 2.5 Flash' : selectedModel}</span>
+                    <span>{selectedModel === 'gpt-4o' ? 'OpenAI GPT-4o' : 'Gemini 4 Hydrogen'}</span>
                     <ChevronUp className="w-3 h-3 text-[#717582]" />
                   </button>
 
                   {isModelDropdownOpen && (
                     <div className="absolute bottom-full mb-1 right-0 w-48 bg-[#18191e] border border-[#2c2f3b] rounded-xl shadow-2xl py-1 text-xs z-50">
                       {[
-                        { id: 'gpt-4o', label: 'OpenAI GPT-4o' },
-                        { id: 'gemini-2.5-flash', label: 'Gemini 2.5 Flash' },
-                        { id: 'claude-3.5', label: 'Claude 3.5 Sonnet' },
-                        { id: 'deepseek-r1', label: 'DeepSeek-R1' },
-                        { id: 'sovereign', label: 'Sovereign Enclave' }
+                        { id: 'gemini-4-hydrogen', label: 'Gemini 4 Hydrogen' },
+                        { id: 'gpt-4o', label: 'OpenAI GPT-4o' }
                       ].map(m => (
                         <button
                           key={m.id}
@@ -872,9 +874,9 @@ export const OdysseusWorkstation: React.FC<OdysseusProps> = ({
               </div>
 
               <div className="p-3 rounded-xl bg-[#1f2128] border border-[#2a2d38] space-y-1">
-                <span className="text-[10px] text-[#717582] font-semibold uppercase block">Gemini 2.5 Flash</span>
+                <span className="text-[10px] text-[#717582] font-semibold uppercase block">Gemini 4 Hydrogen</span>
                 <div className="flex items-center justify-between">
-                  <span className="font-bold text-white">Active</span>
+                  <span className="font-bold text-white">Server Runtime</span>
                   <span className="w-2 h-2 rounded-full bg-emerald-500" />
                 </div>
               </div>

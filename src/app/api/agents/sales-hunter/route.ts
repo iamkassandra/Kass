@@ -1,27 +1,42 @@
-import { NextRequest, NextResponse } from 'next/server';
-import { openAIService, OPENAI_MODEL } from '@/lib/services/OpenAIService';
+import { NextResponse } from 'next/server';
+import { withAuth, AuthenticatedRequest } from '@/middleware/auth';
+import { openAIService } from '@/lib/services/OpenAIService';
 
-export async function POST(req: NextRequest) {
+export const POST = withAuth(async (req: AuthenticatedRequest) => {
   try {
     const body = await req.json();
-    const { targetNiche, locationOrKeyword, offerDescription } = body;
+    const niche = String(
+      body?.niche || body?.targetNiche || 'Local Service Businesses & Clinics'
+    ).trim();
+    const location = String(
+      body?.location || body?.locationOrKeyword || 'Auckland & ANZ Metro'
+    ).trim();
+    const offerDescription = String(
+      body?.offerDescription ||
+        'Autonomous AI Receptionist & Stripe Booking Engine ($997 setup + $299/mo)'
+    ).trim();
 
     const result = await openAIService.runHunterCloserCycle({
-      targetNiche: targetNiche || 'Local Service Businesses & Clinics',
-      locationOrKeyword: locationOrKeyword || 'Auckland & ANZ Metro',
-      offerDescription: offerDescription || 'Autonomous AI Receptionist & Stripe Booking Engine ($997 setup + $299/mo)'
+      niche,
+      location,
+      offerDescription,
     });
 
     return NextResponse.json({
       success: true,
-      model: OPENAI_MODEL,
-      result
+      model: result.model,
+      result,
     });
   } catch (error: any) {
     console.error('[API /api/agents/sales-hunter] Error:', error);
-    return NextResponse.json({
-      success: false,
-      error: error?.message || 'Failed to run hunter-closer sales cycle'
-    }, { status: 500 });
+    const status = typeof error?.statusCode === 'number' ? error.statusCode : 500;
+    return NextResponse.json(
+      {
+        success: false,
+        code: error?.code || 'HUNTER_ERROR',
+        error: error?.message || 'Failed to execute hunter-closer sales cycle.',
+      },
+      { status }
+    );
   }
-}
+});

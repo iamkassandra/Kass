@@ -45,10 +45,10 @@ export async function POST(request: NextRequest) {
       message: result.message
     });
 
-    // Set auth_token cookie
+    // Set auth_token as HTTP-only cookie
     response.cookies.set('auth_token', result.token!, {
-      httpOnly: false,
-      secure: false,
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production',
       sameSite: 'lax',
       maxAge: 24 * 60 * 60, // 24 hours
       path: '/'
@@ -57,7 +57,7 @@ export async function POST(request: NextRequest) {
     // Set refresh token as HTTP-only cookie
     response.cookies.set('refresh_token', result.refreshToken!, {
       httpOnly: true,
-      secure: false,
+      secure: process.env.NODE_ENV === 'production',
       sameSite: 'lax',
       maxAge: 30 * 24 * 60 * 60, // 30 days
       path: '/'

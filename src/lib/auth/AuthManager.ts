@@ -2,6 +2,8 @@ import MockDatabase from '../database/MockSqlite';
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 import { randomBytes } from 'crypto';
+import fs from 'fs';
+import path from 'path';
 
 interface User {
   id: string;
@@ -41,6 +43,47 @@ interface AuthResult {
   message?: string;
 }
 
+function resolveOrCreateAuthSecrets(): { jwtSecret: string; refreshSecret: string } {
+  if (process.env.JWT_SECRET && process.env.REFRESH_SECRET) {
+    return {
+      jwtSecret: process.env.JWT_SECRET.trim(),
+      refreshSecret: process.env.REFRESH_SECRET.trim(),
+    };
+  }
+
+  const dataDir = path.resolve(process.cwd(), 'data');
+  const secretsFile = path.resolve(dataDir, '.auth-secrets.json');
+  if (!secretsFile.startsWith(dataDir + path.sep)) {
+    throw new Error('Invalid secrets file path');
+  }
+
+  try {
+    if (!fs.existsSync(dataDir)) {
+      fs.mkdirSync(dataDir, { recursive: true, mode: 0o700 });
+    }
+    if (fs.existsSync(secretsFile)) {
+      const parsed = JSON.parse(fs.readFileSync(secretsFile, 'utf8'));
+      if (parsed?.jwtSecret && parsed?.refreshSecret) {
+        return {
+          jwtSecret: process.env.JWT_SECRET?.trim() || String(parsed.jwtSecret),
+          refreshSecret: process.env.REFRESH_SECRET?.trim() || String(parsed.refreshSecret),
+        };
+      }
+    }
+    const generated = {
+      jwtSecret: process.env.JWT_SECRET?.trim() || randomBytes(32).toString('hex'),
+      refreshSecret: process.env.REFRESH_SECRET?.trim() || randomBytes(32).toString('hex'),
+    };
+    fs.writeFileSync(secretsFile, JSON.stringify(generated, null, 2), { mode: 0o600 });
+    return generated;
+  } catch {
+    return {
+      jwtSecret: process.env.JWT_SECRET?.trim() || randomBytes(32).toString('hex'),
+      refreshSecret: process.env.REFRESH_SECRET?.trim() || randomBytes(32).toString('hex'),
+    };
+  }
+}
+
 export class AuthManager {
   private db: MockDatabase;
   private jwtSecret: string;
@@ -51,18 +94,12 @@ export class AuthManager {
   constructor(dbPath: string = './data/agent-system.db') {
     this.db = new MockDatabase(dbPath);
 
-    // Use consistent JWT secrets across requests and workers
-    this.jwtSecret = process.env.JWT_SECRET || 'ai-agent-team-jwt-secret-stable-key-2024';
-    this.refreshSecret = process.env.REFRESH_SECRET || 'ai-agent-team-refresh-secret-stable-key-2024';
+    const secrets = resolveOrCreateAuthSecrets();
+    this.jwtSecret = secrets.jwtSecret;
+    this.refreshSecret = secrets.refreshSecret;
 
     this.initializeAuthTables();
     this.createDefaultAdminUser();
-
-    console.log('[AuthManager] Authentication system initialized');
-  }
-
-  private generateSecureSecret(): string {
-    return 'ai-agent-team-jwt-secret-stable-key-2024';
   }
 
   private initializeAuthTables(): void {
@@ -108,8 +145,8 @@ export class AuthManager {
 
   private createDefaultAdminUser(): void {
     try {
-      const defaultPassword = process.env.ADMIN_PASSWORD || 'admin123';
-      const passwordHash = bcrypt.hashSync(defaultPassword, 10);
+      const configuredPassword = process.env.ADMIN_PASSWORD?.trim() || 'admin123';
+      const passwordHash = bcrypt.hashSync(configuredPassword, 10);
 
       // Check if admin user already exists
       const existingAdmin = this.getUserByUsername('admin');
@@ -117,9 +154,8 @@ export class AuthManager {
         return;
       }
 
-      // Create default admin user for access
       const adminUser: User = {
-        id: `user-admin-default`,
+        id: 'user-admin-default',
         username: 'admin',
         email: 'admin@localhost',
         passwordHash,
@@ -142,8 +178,6 @@ export class AuthManager {
         adminUser.isActive ? 1 : 0,
         adminUser.createdAt.toISOString()
       );
-
-      console.log('[AuthManager] Default admin user initialized (username: admin / password: admin123)');
     } catch (error) {
       console.error('[AuthManager] Error creating default admin user:', error);
     }
@@ -165,30 +199,8 @@ export class AuthManager {
       // Ensure default admin exists
       this.createDefaultAdminUser();
 
-      const lowerUsername = cleanUsername.toLowerCase();
-
       // Get user by username or email
-      let user = this.getUserByUsername(cleanUsername) || this.getUserByEmail(cleanUsername);
-      
-      // Auto-create/fallback admin if matching admin or authorized admin email
-      const isAdminIdentifier = 
-        lowerUsername === 'admin' || 
-        lowerUsername === 'admin@localhost' || 
-        lowerUsername === 'theaucklandassistant@gmail.com' ||
-        lowerUsername.startsWith('admin');
-
-      if (!user && isAdminIdentifier) {
-        const passwordHash = bcrypt.hashSync('admin123', 10);
-        user = {
-          id: 'user-admin-default',
-          username: 'admin',
-          email: cleanUsername.includes('@') ? cleanUsername : 'admin@localhost',
-          passwordHash,
-          role: 'admin',
-          isActive: true,
-          createdAt: new Date()
-        };
-      }
+      const user = this.getUserByUsername(cleanUsername) || this.getUserByEmail(cleanUsername);
 
       if (!user) {
         return {
@@ -205,7 +217,7 @@ export class AuthManager {
         };
       }
 
-      // Verify password
+      // Verify password strictly against stored bcrypt hash
       let isValidPassword = false;
       try {
         if (user.passwordHash) {
@@ -213,14 +225,6 @@ export class AuthManager {
         }
       } catch {
         isValidPassword = false;
-      }
-
-      // Support fallback credentials for admin users
-      if (user.role === 'admin' || isAdminIdentifier || user.username.toLowerCase() === 'admin') {
-        const allowedDefaults = ['admin123', 'secure-admin-2024', 'admin', 'password', process.env.ADMIN_PASSWORD].filter(Boolean);
-        if (allowedDefaults.includes(cleanPassword)) {
-          isValidPassword = true;
-        }
       }
 
       if (!isValidPassword) {
@@ -332,12 +336,12 @@ export class AuthManager {
       // Verify refresh token
       const decoded = jwt.verify(refreshToken, this.refreshSecret) as any;
 
-      // Get session
+      // Get session if present in current worker; reject only if explicitly deactivated
       const session = this.getSessionByRefreshToken(refreshToken);
-      if (!session || !session.isActive) {
+      if (session && !session.isActive) {
         return {
           success: false,
-          message: 'Invalid refresh token'
+          message: 'Refresh token has been revoked'
         };
       }
 
@@ -353,8 +357,20 @@ export class AuthManager {
       // Generate new tokens
       const tokens = this.generateTokens(user);
 
-      // Update session with new tokens
-      this.updateSessionTokens(session.id, tokens.token, tokens.refreshToken);
+      // Update existing session or recreate active session record
+      if (session) {
+        this.updateSessionTokens(session.id, tokens.token, tokens.refreshToken);
+      } else {
+        this.saveAuthSession({
+          id: `session-${Date.now()}`,
+          userId: user.id,
+          token: tokens.token,
+          refreshToken: tokens.refreshToken,
+          expiresAt: new Date(Date.now() + this.tokenExpiryTime),
+          isActive: true,
+          createdAt: new Date()
+        });
+      }
 
       const { passwordHash, ...safeUser } = user;
 
@@ -487,35 +503,24 @@ export class AuthManager {
 
   private getUserByUsername(username: string): User | null {
     const cleanUsername = (username || '').trim().toLowerCase();
-    if (cleanUsername === 'admin') {
-      const row = this.db.prepare('SELECT * FROM users WHERE username = ?').get('admin') as any;
-      if (row) {
+    const stmt = this.db.prepare('SELECT * FROM users WHERE username = ?');
+    const row = stmt.get(cleanUsername) as any;
+
+    if (!row) {
+      if (cleanUsername === 'admin') {
+        const configuredPassword = process.env.ADMIN_PASSWORD?.trim() || 'admin123';
         return {
-          id: row.id || 'user-admin-default',
+          id: 'user-admin-default',
           username: 'admin',
-          email: row.email || 'admin@localhost',
-          passwordHash: row.password_hash || bcrypt.hashSync('admin123', 10),
+          email: 'admin@localhost',
+          passwordHash: bcrypt.hashSync(configuredPassword, 10),
           role: 'admin',
           isActive: true,
-          createdAt: new Date(row.created_at || Date.now()),
-          lastLogin: row.last_login ? new Date(row.last_login) : undefined
+          createdAt: new Date()
         };
       }
-      return {
-        id: 'user-admin-default',
-        username: 'admin',
-        email: 'admin@localhost',
-        passwordHash: bcrypt.hashSync('admin123', 10),
-        role: 'admin',
-        isActive: true,
-        createdAt: new Date()
-      };
+      return null;
     }
-
-    const stmt = this.db.prepare('SELECT * FROM users WHERE username = ?');
-    const row = stmt.get(username) as any;
-
-    if (!row) return null;
 
     return {
       id: row.id,
@@ -536,7 +541,7 @@ export class AuthManager {
     }
 
     const stmt = this.db.prepare('SELECT * FROM users WHERE email = ?');
-    const row = stmt.get(email) as any;
+    const row = stmt.get(cleanEmail) as any;
 
     if (!row) return null;
 

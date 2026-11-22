@@ -1,37 +1,45 @@
-import { NextRequest, NextResponse } from 'next/server';
-import { openAIService, OPENAI_MODEL } from '@/lib/services/OpenAIService';
+import { NextResponse } from 'next/server';
+import { withAuth, AuthenticatedRequest } from '@/middleware/auth';
+import { openAIService, getActiveModelLabel } from '@/lib/services/OpenAIService';
 
-export async function POST(req: NextRequest) {
+export const POST = withAuth(async (req: AuthenticatedRequest) => {
   try {
     const body = await req.json();
-    const { objective, businessType, targetMarket, budget } = body;
+    const objective = String(body?.objective || '').trim();
+    const businessType = body?.businessType ? String(body.businessType) : undefined;
+    const targetMarket = body?.targetMarket ? String(body.targetMarket) : undefined;
+    const budget = body?.budget ? Number(body.budget) : undefined;
 
-    if (!objective || typeof objective !== 'string' || objective.trim().length === 0) {
-      return NextResponse.json({
-        success: false,
-        error: 'Objective is required to generate an autonomous project plan.'
-      }, { status: 400 });
+    if (!objective) {
+      return NextResponse.json(
+        { success: false, error: 'Objective is required to generate a project plan.' },
+        { status: 400 }
+      );
     }
 
     const plan = await openAIService.generateAutonomousProjectPlan({
-      objective: objective.trim(),
+      objective,
       businessType,
       targetMarket,
-      budget: budget ? Number(budget) : undefined
+      budget,
     });
 
     return NextResponse.json({
       success: true,
-      model: OPENAI_MODEL,
+      model: getActiveModelLabel(),
       plan,
-      generatedAt: new Date().toISOString()
+      generatedAt: new Date().toISOString(),
     });
   } catch (error: any) {
     console.error('[API /api/agents/plan] Error:', error);
-    return NextResponse.json({
-      success: false,
-      model: OPENAI_MODEL,
-      error: error?.message || 'Failed to generate autonomous plan with OpenAI GPT-4o'
-    }, { status: 500 });
+    const status = typeof error?.statusCode === 'number' ? error.statusCode : 500;
+    return NextResponse.json(
+      {
+        success: false,
+        code: error?.code || 'PLAN_ERROR',
+        error: error?.message || 'Failed to generate project plan.',
+      },
+      { status }
+    );
   }
-}
+});

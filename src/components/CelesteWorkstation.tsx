@@ -59,6 +59,7 @@ import {
   CheckCircle2,
   AlertCircle
 } from 'lucide-react';
+import { authFetch, type ServerCapabilities } from '@/lib/client/authFetch';
 
 export interface CelesteProps {
   onOpenDashboard?: () => void;
@@ -68,6 +69,12 @@ export interface CelesteProps {
   onOpenSpawnProject?: () => void;
   isTriggeringPush?: boolean;
   isTriggeringZip?: boolean;
+  capabilities?: ServerCapabilities | null;
+  persistedNotes?: NoteItem[];
+  onUpdateNotes?: (notes: NoteItem[]) => void;
+  persistedTasks?: TaskItem[];
+  onUpdateTasks?: (tasks: TaskItem[]) => void;
+  exportEmail?: string;
 }
 
 export type CelesteModule =
@@ -92,6 +99,8 @@ export interface ChatMessage {
   content: string;
   timestamp: string;
   model?: string;
+  isError?: boolean;
+  groundingSources?: Array<{ title: string; uri: string }>;
   actions?: Array<{ label: string; action: () => void; variant?: 'primary' | 'secondary' }>;
 }
 
@@ -127,26 +136,91 @@ export interface EmailItem {
   tag: string;
 }
 
+const DEFAULT_NOTES: NoteItem[] = [
+  {
+    id: 'note-1',
+    title: '12h Sprints & Cash Flow Moat',
+    content: '# Strategic Revenue Directives\n- 12h sprint cycles deployed across Apex Capital and Matrix Forge.\n- Focus on Stripe payment links & automated B2B outreach.\n- Real-time workspace snapshot & Git sync pipelines.',
+    category: 'Strategy',
+    updatedAt: 'Synced',
+    tags: ['Revenue', 'Sprints']
+  },
+  {
+    id: 'note-2',
+    title: 'Scrap Bank Recycling Priorities',
+    content: '# Scrap Bank Monetization\n1. Quick-Turnaround WhatsApp Automation Bot.\n2. B2B Invoice PDF Extractor Tool.\n3. Local Clinic AI Receptionist.',
+    category: 'Scrap Bank',
+    updatedAt: 'Synced',
+    tags: ['Recycling', 'Gems', 'Matrix']
+  }
+];
+
+const DEFAULT_TASKS: TaskItem[] = [
+  {
+    id: 'task-1',
+    title: 'Verify repository sync & workspace backup archive',
+    description: 'Run git status/remote verification and export downloadable .zip workspace archive.',
+    assignedAgent: 'Titan (Ops)',
+    status: 'in-progress',
+    priority: 'urgent',
+    empire: 'Apex Sovereign Capital'
+  },
+  {
+    id: 'task-2',
+    title: 'Mine raw project backlogs for reusable SaaS gems',
+    description: 'Identify top monetization angle and launchable MVP scope.',
+    assignedAgent: 'Gem-Miner',
+    status: 'in-progress',
+    priority: 'high',
+    empire: 'Matrix SaaS Forge'
+  },
+  {
+    id: 'task-3',
+    title: 'Run live Outbound Hunter research for local service leads',
+    description: 'Use Google Search grounding to identify high-intent local businesses and outreach angles.',
+    assignedAgent: 'Vanguard',
+    status: 'backlog',
+    priority: 'high',
+    empire: 'Apex Sovereign Capital'
+  },
+  {
+    id: 'task-4',
+    title: 'Run live Border Council triage on inbound lead',
+    description: 'Synthesize multi-perspective routing decision and priority.',
+    assignedAgent: 'Moat-Council',
+    status: 'completed',
+    priority: 'normal',
+    empire: 'Apex Sovereign Capital'
+  }
+];
+
 export const CelesteWorkstation: React.FC<CelesteProps> = ({
   onOpenDashboard,
   onSelectTab,
   onTriggerPush,
   onTriggerZip,
-  onOpenSpawnProject,
   isTriggeringPush = false,
-  isTriggeringZip = false
+  isTriggeringZip = false,
+  capabilities = null,
+  persistedNotes,
+  onUpdateNotes,
+  persistedTasks,
+  onUpdateTasks,
+  exportEmail = 'theaucklandassistant@gmail.com'
 }) => {
   // Navigation & View State
   const [activeModule, setActiveModule] = useState<CelesteModule>('chat');
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
   const [chatMode, setChatMode] = useState<'agent' | 'chat'>('chat');
-  const [selectedModel, setSelectedModel] = useState<'gpt-4o' | 'gemini-2.5-flash' | 'claude-3.5' | 'deepseek-r1' | 'kommandra-sovereign' | 'celeste-sovereign'>('gpt-4o');
+  const [selectedModel, setSelectedModel] = useState<'gemini-4-hydrogen' | 'gpt-4o'>('gemini-4-hydrogen');
   const [isModelDropdownOpen, setIsModelDropdownOpen] = useState(false);
   const [isAudienceDropdownOpen, setIsAudienceDropdownOpen] = useState(false);
   const [selectedAudience, setSelectedAudience] = useState<string>('Korban (קָרְבָּן)');
-  const [isWebSearchEnabled, setIsWebSearchEnabled] = useState(false);
+  const [isWebSearchEnabled, setIsWebSearchEnabled] = useState(true);
   const [isSetupModalOpen, setIsSetupModalOpen] = useState(false);
   const [copiedKey, setCopiedKey] = useState<string | null>(null);
+  const [localCapabilities, setLocalCapabilities] = useState<ServerCapabilities | null>(capabilities);
+  const [isTestingConnection, setIsTestingConnection] = useState(false);
 
   // Chat State
   const [chatInput, setChatInput] = useState('');
@@ -162,91 +236,94 @@ export const CelesteWorkstation: React.FC<CelesteProps> = ({
   // Email Module State
   const [selectedEmail, setSelectedEmail] = useState<EmailItem | null>(null);
   const [isComposeOpen, setIsComposeOpen] = useState(false);
-  const [composeTo, setComposeTo] = useState('theaucklandassistant@gmail.com');
+  const [composeTo, setComposeTo] = useState(exportEmail);
   const [composeSubject, setComposeSubject] = useState('');
   const [composeBody, setComposeBody] = useState('');
+  const [isSendingEmail, setIsSendingEmail] = useState(false);
   const [emailStatusToast, setEmailStatusToast] = useState<string | null>(null);
+  const [emailError, setEmailError] = useState<string | null>(null);
 
-  // Notes State
-  const [notes, setNotes] = useState<NoteItem[]>([
-    {
-      id: 'note-1',
-      title: 'Sovereign 12h Sprints & Cash Flow Moat',
-      content: '# Strategic Revenue Directives\n- 12h sprint cycles deployed across Apex Capital and Matrix Forge.\n- Focus on Stripe micro-payments & automated lead generation.\n- Continuous 10-minute git backup pipelines active.',
-      category: 'Strategy',
-      updatedAt: 'Just now',
-      tags: ['Revenue', 'Sprints', 'Sovereign']
-    },
-    {
-      id: 'note-2',
-      title: 'Scrap File Recycling Priorities',
-      content: '# Scrap Bank Monetization\n1. Quick-Turnaround WhatsApp Automation Bot.\n2. B2B Invoice PDF Extractor Tool.\n3. Sovereign Local Enclave Auth Middleware.',
-      category: 'Scrap Bank',
-      updatedAt: '12m ago',
-      tags: ['Recycling', 'Gems', 'Matrix']
-    }
-  ]);
-  const [selectedNote, setSelectedNote] = useState<NoteItem>(notes[0]);
-  const [noteTitle, setNoteTitle] = useState(notes[0].title);
-  const [noteContent, setNoteContent] = useState(notes[0].content);
+  // Notes State (Synced with persisted workspace)
+  const initialNotes = persistedNotes && persistedNotes.length > 0 ? persistedNotes : DEFAULT_NOTES;
+  const [notes, setNotes] = useState<NoteItem[]>(initialNotes);
+  const [selectedNote, setSelectedNote] = useState<NoteItem>(initialNotes[0]);
+  const [noteTitle, setNoteTitle] = useState(initialNotes[0].title);
+  const [noteContent, setNoteContent] = useState(initialNotes[0].content);
 
-  // Tasks State
-  const [tasks, setTasks] = useState<TaskItem[]>([
-    {
-      id: 'task-1',
-      title: 'Auto-compile 10-minute repository backup',
-      description: 'Continuous daemon committing code across all 4 container repos.',
-      assignedAgent: 'Vanguard (Ops)',
-      status: 'in-progress',
-      priority: 'urgent',
-      empire: 'Apex Sovereign Capital'
-    },
-    {
-      id: 'task-2',
-      title: 'Mine 5 raw project backlogs for reusable SaaS gems',
-      description: 'Identify top monetization angle and auto-generate landing page copy.',
-      assignedAgent: 'Gem-Miner',
-      status: 'in-progress',
-      priority: 'high',
-      empire: 'Matrix SaaS Forge'
-    },
-    {
-      id: 'task-3',
-      title: 'Deploy 24/7 Outbound Hunter squad for local business leads',
-      description: 'Scrape Google Maps & high-intent directories for Auckland & NZ businesses.',
-      assignedAgent: 'Hunter-Alpha',
-      status: 'backlog',
-      priority: 'high',
-      empire: 'Apex Sovereign Capital'
-    },
-    {
-      id: 'task-4',
-      title: 'Run Border Council Moat Synthesis on multi-model stack',
-      description: 'Verify model consensus between GPT-4o, Claude 3.5, and Gemini 2.5.',
-      assignedAgent: 'Moat-Council',
-      status: 'completed',
-      priority: 'normal',
-      empire: 'Sovereign Enclave'
-    }
-  ]);
+  // Tasks State (Synced with persisted workspace)
+  const initialWorkTasks = persistedTasks && persistedTasks.length > 0 ? persistedTasks : DEFAULT_TASKS;
+  const [tasks, setTasks] = useState<TaskItem[]>(initialWorkTasks);
   const [isNewTaskOpen, setIsNewTaskOpen] = useState(false);
   const [newTaskTitle, setNewTaskTitle] = useState('');
-  const [newTaskAgent, setNewTaskAgent] = useState('Digital Kassandra');
+  const [newTaskAgent, setNewTaskAgent] = useState('Korban (קָרְבָּן)');
   const [newTaskPriority, setNewTaskPriority] = useState<'urgent' | 'high' | 'normal'>('high');
 
   // Deep Research State
   const [researchTopic, setResearchTopic] = useState('High-margin B2B micro-SaaS opportunities for sole operators');
   const [isResearching, setIsResearching] = useState(false);
   const [researchReport, setResearchReport] = useState<string | null>(null);
+  const [researchSources, setResearchSources] = useState<Array<{ title: string; uri: string }>>([]);
+  const [researchError, setResearchError] = useState<string | null>(null);
 
   // Compare Models State
   const [comparePrompt, setComparePrompt] = useState('Formulate a 3-step rapid go-to-market plan to convert cold B2B prospects into $500/mo retainer clients within 48 hours.');
   const [isComparing, setIsComparing] = useState(false);
   const [compareResults, setCompareResults] = useState<{
-    gpt4o?: string;
-    claude?: string;
-    gemini?: string;
+    gemini?: { text?: string; error?: string; latencyMs?: number };
+    gpt4o?: { text?: string; error?: string; latencyMs?: number };
   } | null>(null);
+
+  useEffect(() => {
+    if (capabilities) {
+      setLocalCapabilities(capabilities);
+      if (!capabilities.geminiConfigured && capabilities.openaiConfigured) {
+        setSelectedModel('gpt-4o');
+      }
+    } else {
+      authFetch('/api/ops/status')
+        .then(r => (r.ok ? r.json() : null))
+        .then(data => {
+          if (data?.success) {
+            setLocalCapabilities(data);
+            if (!data.geminiConfigured && data.openaiConfigured) {
+              setSelectedModel('gpt-4o');
+            }
+          }
+        })
+        .catch(() => {});
+    }
+  }, [capabilities]);
+
+  useEffect(() => {
+    if (persistedNotes && persistedNotes.length > 0) {
+      setNotes(persistedNotes);
+    }
+  }, [persistedNotes]);
+
+  useEffect(() => {
+    if (persistedTasks && persistedTasks.length > 0) {
+      setTasks(persistedTasks);
+    }
+  }, [persistedTasks]);
+
+  useEffect(() => {
+    setComposeTo(exportEmail);
+  }, [exportEmail]);
+
+  const handleRefreshServerStatus = async (runPing = false) => {
+    setIsTestingConnection(true);
+    try {
+      const res = await authFetch(`/api/ops/status${runPing ? '?test=true' : ''}`);
+      const data = await res.json();
+      if (data?.success) {
+        setLocalCapabilities(data);
+      }
+    } catch {
+      // Keep previous capability state
+    } finally {
+      setIsTestingConnection(false);
+    }
+  };
 
   // Auto-scroll to bottom of chat
   useEffect(() => {
@@ -316,6 +393,7 @@ export const CelesteWorkstation: React.FC<CelesteProps> = ({
     if (textToSend.startsWith('/setup')) {
       setChatInput('');
       setIsSetupModalOpen(true);
+      handleRefreshServerStatus(false);
       return;
     }
 
@@ -333,9 +411,9 @@ export const CelesteWorkstation: React.FC<CelesteProps> = ({
         {
           id: `resp-${Date.now()}`,
           role: 'assistant',
-          content: '🌸 KOMMANDRA Sovereign Daemon triggered: Instant GitHub push dispatched across Apex Sovereign Capital and Matrix SaaS Forge repositories.',
+          content: 'Running real repository status & GitHub remote check. Check the Executive Event Stream or top banner for the exact sync result.',
           timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-          model: 'KOMMANDRA Daemon'
+          model: 'KOMMANDRA Ops'
         }
       ]);
       return;
@@ -355,9 +433,9 @@ export const CelesteWorkstation: React.FC<CelesteProps> = ({
         {
           id: `resp-${Date.now()}`,
           role: 'assistant',
-          content: '📦 Encrypted KOMMANDRA backup archive created and dispatched to theaucklandassistant@gmail.com.',
+          content: 'Building real .ZIP archive from your persisted workspace and initiating browser download.',
           timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-          model: 'KOMMANDRA Backup'
+          model: 'KOMMANDRA Archive'
         }
       ]);
       return;
@@ -400,41 +478,61 @@ export const CelesteWorkstation: React.FC<CelesteProps> = ({
     setIsGenerating(true);
 
     try {
-      const response = await fetch('/api/agents/chat', {
+      const response = await authFetch('/api/agents/chat', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           agentRole: chatMode === 'agent' ? 'executive' : 'assistant',
           agentName: selectedAudience,
+          preferredModel: selectedModel,
+          useWebSearch: isWebSearchEnabled,
           message: textToSend,
-          conversationHistory: messages.slice(-6).map(m => ({ role: m.role, content: m.content })),
-          context: `You are KOMMANDRA / Korban (קָרְבָּן) (CEO Clone), directing 17 autonomous agents, 2 empires, and 10-minute backup pipelines with a dreamy soft aesthetic and ruthless operational functionality. Model: ${selectedModel}. Mode: ${chatMode}. Provide sharp, tactical, elegant, and sovereign directives.`
+          conversationHistory: messages
+            .filter(m => !m.isError)
+            .slice(-8)
+            .map(m => ({ role: m.role, content: m.content })),
+          context: `You are KOMMANDRA / Korban (קָרְבָּן), executive AI co-partner for Kassandra. Provide sharp, accurate, actionable strategy, code, and revenue execution steps. Never invent fake URLs or claim external side-effects you did not run. Mode: ${chatMode}.`
         })
       });
 
       const data = await response.json();
-      const assistantText = data.text || 'Directive acknowledged and synchronized across the sovereign KOMMANDRA workforce.';
+      if (!response.ok || !data?.success) {
+        setMessages(prev => [
+          ...prev,
+          {
+            id: `err-${Date.now()}`,
+            role: 'assistant',
+            isError: true,
+            content: data?.error || `AI request failed (${response.status}). Check /setup for server provider configuration.`,
+            timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+            model: 'System Error'
+          }
+        ]);
+        return;
+      }
 
       setMessages(prev => [
         ...prev,
         {
           id: `resp-${Date.now()}`,
           role: 'assistant',
-          content: assistantText,
+          content: data.reply || data.text,
+          groundingSources: Array.isArray(data.groundingSources) ? data.groundingSources : undefined,
           timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
           model: data.model || selectedModel
         }
       ]);
-    } catch (err) {
+    } catch (err: any) {
       console.error('Error communicating with KOMMANDRA:', err);
       setMessages(prev => [
         ...prev,
         {
           id: `err-${Date.now()}`,
           role: 'assistant',
-          content: `🌸 Directive synchronized with KOMMANDRA Sovereign Engine: "${textToSend}". All 17 agents, 10-minute GitHub backup daemons, and revenue pipelines remain 100% operational.`,
+          isError: true,
+          content: err?.message || 'Network error communicating with /api/agents/chat.',
           timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-          model: 'KOMMANDRA Engine'
+          model: 'Network Error'
         }
       ]);
     } finally {
@@ -442,117 +540,165 @@ export const CelesteWorkstation: React.FC<CelesteProps> = ({
     }
   };
 
-  // Run Deep Research
+  // Run Deep Research with Live Google Search Grounding
   const handleRunDeepResearch = async () => {
     if (!researchTopic.trim() || isResearching) return;
     setIsResearching(true);
     setResearchReport(null);
+    setResearchSources([]);
+    setResearchError(null);
 
     try {
-      const res = await fetch('/api/agents/chat', {
+      const res = await authFetch('/api/agents/chat', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           agentRole: 'executive',
           agentName: 'KOMMANDRA Deep Research Agent',
-          message: `Conduct an exhaustive, ruthlessly functional deep research dossier on: "${researchTopic}". Include: 1. Executive Summary & Market Size, 2. Competitor Weaknesses & Pricing Gaps, 3. Exact 48-Hour Execution Blueprint, 4. High-Margin Monetization Strategy ($500-$5,000/mo).`,
-          context: 'Deep Research Agent. Produce a structured, elite, actionable market intelligence dossier.'
+          preferredModel: selectedModel,
+          useWebSearch: true,
+          message: `Conduct a rigorous, real-world market intelligence dossier on: "${researchTopic}". Include: 1. Executive Summary & Market Demand Signals, 2. Competitor Weaknesses & Pricing Gaps, 3. Exact 48-Hour Execution Blueprint, 4. High-Margin Monetization Strategy ($500-$5,000/mo). Only cite real facts and grounded sources.`,
+          context: 'Deep Research Agent with Google Search grounding. Produce a crisp, actionable market intelligence dossier.'
         })
       });
       const data = await res.json();
-      setResearchReport(data.text || 'Dossier successfully synthesized.');
-    } catch (e) {
-      setResearchReport(`### Executive Research Dossier: ${researchTopic}\n\n**1. Market Opportunity Analysis**\n- Underserved demand for automated micro-SaaS tools among local service businesses.\n- High willingness to pay ($299-$1,500/mo) for turnkey, automated revenue engines.\n\n**2. Core Sovereign Advantages**\n- Zero human payroll overhead: 17 autonomous agents handle acquisition, onboarding, and support.\n- 10-Minute backup durability ensures business continuity.\n\n**3. Immediate Action Plan**\n1. Repackage scrap code into single-purpose landing page.\n2. Connect Stripe checkout with automated webhook.\n3. Deploy 24/7 Outbound Hunter squad targeting 50 decision-makers daily.`);
+      if (!res.ok || !data?.success) {
+        setResearchError(data?.error || `Research request failed (${res.status}).`);
+        return;
+      }
+      setResearchReport(data.reply || data.text);
+      if (Array.isArray(data.groundingSources)) {
+        setResearchSources(data.groundingSources);
+      }
+    } catch (e: any) {
+      setResearchError(e?.message || 'Failed to reach research endpoint.');
     } finally {
       setIsResearching(false);
     }
   };
 
-  // Run Model Compare
+  // Run Live Model Comparison (Gemini 4 Hydrogen vs OpenAI GPT-4o)
   const handleRunCompare = async () => {
     if (!comparePrompt.trim() || isComparing) return;
     setIsComparing(true);
     setCompareResults(null);
 
+    const runOne = async (model: 'gemini-4-hydrogen' | 'gpt-4o') => {
+      const started = Date.now();
+      try {
+        const res = await authFetch('/api/agents/chat', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            agentName: model === 'gemini-4-hydrogen' ? 'Gemini 4 Hydrogen' : 'GPT-4o',
+            preferredModel: model,
+            useWebSearch: false,
+            message: comparePrompt,
+            context: `Live model comparison benchmark using ${model}. Keep output tactical and concise.`
+          })
+        });
+        const data = await res.json();
+        const latencyMs = Date.now() - started;
+        if (!res.ok || !data?.success) {
+          return { error: data?.error || `HTTP ${res.status}`, latencyMs };
+        }
+        return { text: data.reply || data.text, latencyMs };
+      } catch (e: any) {
+        return { error: e?.message || 'Request failed', latencyMs: Date.now() - started };
+      }
+    };
+
     try {
-      const [res1, res2] = await Promise.all([
-        fetch('/api/agents/chat', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            agentName: 'GPT-4o Sovereign',
-            message: comparePrompt,
-            context: 'Compare benchmark: GPT-4o'
-          })
-        }),
-        fetch('/api/agents/chat', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            agentName: 'Gemini 2.5 Flash',
-            message: comparePrompt,
-            context: 'Compare benchmark: Gemini 2.5 Flash'
-          })
-        })
+      const [geminiRes, gptRes] = await Promise.all([
+        runOne('gemini-4-hydrogen'),
+        runOne('gpt-4o')
       ]);
-
-      const d1 = await res1.json();
-      const d2 = await res2.json();
-
       setCompareResults({
-        gpt4o: d1.text || 'Step 1: Scrape top 20 prospects. Step 2: Dispatch personalized audit video. Step 3: Close on $500/mo retainer via Stripe link.',
-        claude: 'Tactical Blueprint: 1. Value First Audit (send unprompted teardown). 2. Frictionless Offer (48h risk reversal). 3. Automated Onboarding pipeline.',
-        gemini: d2.text || '1. Direct outreach to local business owners with bespoke solution mockup. 2. 15-minute diagnostic call. 3. Instant invoice dispatch.'
-      });
-    } catch {
-      setCompareResults({
-        gpt4o: '1. Scrape 50 high-intent targets.\n2. Send 3-line pain-point email with live demo link.\n3. Secure payment via instant Stripe invoice.',
-        claude: '1. Build tailored artifact in 20 mins.\n2. Deliver personalized Loom audit.\n3. Offer 14-day ROI guarantee with $500 deposit.',
-        gemini: '1. Automated outreach sequence via Vanguard.\n2. Real-time lead qualification with Digital Kassandra.\n3. 1-click contract close.'
+        gemini: geminiRes,
+        gpt4o: gptRes
       });
     } finally {
       setIsComparing(false);
     }
   };
 
-  // Handle Send Compose Email
-  const handleSendComposeEmail = () => {
-    if (!composeSubject || !composeBody) return;
-    setEmailStatusToast(`Email successfully dispatched to ${composeTo}!`);
-    setIsComposeOpen(false);
-    setComposeSubject('');
-    setComposeBody('');
-    setTimeout(() => setEmailStatusToast(null), 4000);
+  // Handle Send Real Outbound Email via /api/ops/actions
+  const handleSendComposeEmail = async () => {
+    if (!composeSubject.trim() || !composeBody.trim() || !composeTo.trim() || isSendingEmail) return;
+    setIsSendingEmail(true);
+    setEmailError(null);
+    setEmailStatusToast(null);
+
+    try {
+      const res = await authFetch('/api/ops/actions', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'send_email',
+          to: composeTo.trim(),
+          subject: composeSubject.trim(),
+          text: composeBody.trim()
+        })
+      });
+      const data = await res.json();
+      if (!res.ok || !data?.success) {
+        setEmailError(data?.error || `Email dispatch failed (${res.status}).`);
+        return;
+      }
+
+      setEmailStatusToast(data.message || `Email dispatched to ${composeTo}.`);
+      setIsComposeOpen(false);
+      setComposeSubject('');
+      setComposeBody('');
+      setTimeout(() => setEmailStatusToast(null), 5000);
+    } catch (e: any) {
+      setEmailError(e?.message || 'Network error while dispatching email.');
+    } finally {
+      setIsSendingEmail(false);
+    }
   };
 
-  // Save Note
+  // Save Note & Sync to Persisted Workspace
   const handleSaveNote = () => {
-    setNotes(prev =>
-      prev.map(n => (n.id === selectedNote.id ? { ...n, title: noteTitle, content: noteContent, updatedAt: 'Just now' } : n))
+    const updated = notes.map(n =>
+      n.id === selectedNote.id
+        ? { ...n, title: noteTitle, content: noteContent, updatedAt: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) }
+        : n
     );
-    setSelectedNote(prev => ({ ...prev, title: noteTitle, content: noteContent, updatedAt: 'Just now' }));
+    setNotes(updated);
+    onUpdateNotes?.(updated);
+    setSelectedNote(prev => ({
+      ...prev,
+      title: noteTitle,
+      content: noteContent,
+      updatedAt: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+    }));
   };
 
-  // Add Task
+  // Add Task & Sync to Persisted Workspace
   const handleAddTask = () => {
     if (!newTaskTitle.trim()) return;
     const newTask: TaskItem = {
       id: `task-${Date.now()}`,
-      title: newTaskTitle,
-      description: 'Autonomous directive generated from KOMMANDRA Workstation.',
+      title: newTaskTitle.trim(),
+      description: 'Operational directive created from KOMMANDRA Workstation.',
       assignedAgent: newTaskAgent,
       status: 'in-progress',
       priority: newTaskPriority,
       empire: 'Apex Sovereign Capital'
     };
-    setTasks(prev => [newTask, ...prev]);
+    const updated = [newTask, ...tasks];
+    setTasks(updated);
+    onUpdateTasks?.(updated);
     setNewTaskTitle('');
     setIsNewTaskOpen(false);
   };
 
-  // Move Task Status
+  // Move Task Status & Sync to Persisted Workspace
   const handleMoveTask = (taskId: string, newStatus: TaskItem['status']) => {
-    setTasks(prev => prev.map(t => (t.id === taskId ? { ...t, status: newStatus } : t)));
+    const updated = tasks.map(t => (t.id === taskId ? { ...t, status: newStatus } : t));
+    setTasks(updated);
+    onUpdateTasks?.(updated);
   };
 
   return (
@@ -957,14 +1103,16 @@ export const CelesteWorkstation: React.FC<CelesteProps> = ({
                 </div>
 
                 {/* Quick Action Cards */}
-                <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 w-full pt-4">
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 w-full pt-4">
                   {[
+                    { label: '/alerts', desc: 'Agent Alerts & Workload', action: () => onSelectTab && onSelectTab('workforce'), color: 'border-rose-500/30 text-rose-300' },
+                    { label: '/ratings', desc: 'Visual Score & Timeliness', action: () => onSelectTab && onSelectTab('projects'), color: 'border-cyan-500/30 text-cyan-300' },
+                    { label: '/pulse', desc: 'Executive Ops Overview', action: () => onSelectTab && onSelectTab('command-centre'), color: 'border-indigo-500/30 text-indigo-300' },
                     { label: '/setup', desc: 'Sovereign Keys & Config', action: () => setIsSetupModalOpen(true), color: 'border-pink-500/30 text-pink-300' },
                     { label: '/mine', desc: 'Recycle Scrap Gems', action: () => onSelectTab && onSelectTab('scrap-miner'), color: 'border-amber-500/30 text-amber-300' },
                     { label: '/forecast', desc: '33-Day 12h Profit Model', action: () => onSelectTab && onSelectTab('profit-forecast'), color: 'border-emerald-500/30 text-emerald-300' },
                     { label: '/sales', desc: '24/7 Outbound Hunters', action: () => onSelectTab && onSelectTab('outbound-hunters'), color: 'border-sky-500/30 text-sky-300' },
-                    { label: '/push', desc: 'Trigger 10-Min Push', action: () => handleSendMessage('/push'), color: 'border-purple-500/30 text-purple-300' },
-                    { label: '/zip', desc: 'Backup to Email', action: () => handleSendMessage('/zip'), color: 'border-rose-500/30 text-rose-300' }
+                    { label: '/push', desc: 'Trigger 10-Min Push', action: () => handleSendMessage('/push'), color: 'border-purple-500/30 text-purple-300' }
                   ].map(cmd => (
                     <button
                       key={cmd.label}
@@ -1010,8 +1158,36 @@ export const CelesteWorkstation: React.FC<CelesteProps> = ({
                       </div>
 
                       <div className="whitespace-pre-wrap font-sans text-xs text-slate-100 leading-relaxed">
+                        {msg.isError && (
+                          <div className="mb-2 flex items-center gap-1.5 text-rose-300 font-semibold">
+                            <AlertCircle className="w-3.5 h-3.5 shrink-0" />
+                            <span>Live Execution Error</span>
+                          </div>
+                        )}
                         {msg.content}
                       </div>
+
+                      {msg.groundingSources && msg.groundingSources.length > 0 && (
+                        <div className="pt-2 border-t border-slate-800/80 space-y-1">
+                          <span className="text-[10px] font-semibold text-sky-300 uppercase tracking-wider block">
+                            Verified Google Search Sources
+                          </span>
+                          <div className="flex flex-wrap gap-1.5">
+                            {msg.groundingSources.map((src, idx) => (
+                              <a
+                                key={idx}
+                                href={src.uri}
+                                target="_blank"
+                                rel="noreferrer"
+                                className="inline-flex items-center gap-1 px-2 py-0.5 rounded-lg bg-sky-500/10 hover:bg-sky-500/20 border border-sky-400/25 text-[10px] text-sky-200 max-w-[220px] truncate"
+                              >
+                                <ExternalLink className="w-2.5 h-2.5 shrink-0" />
+                                <span className="truncate">{src.title}</span>
+                              </a>
+                            ))}
+                          </div>
+                        </div>
+                      )}
                     </div>
                   </div>
                 ))}
@@ -1022,7 +1198,7 @@ export const CelesteWorkstation: React.FC<CelesteProps> = ({
                       <Loader2 className="w-4 h-4 animate-spin" />
                     </div>
                     <div className="p-3.5 rounded-2xl bg-[#121727]/90 border border-slate-700/80 text-xs text-pink-200 flex items-center gap-2">
-                      <span>Synthesizing autonomous KOMMANDRA directive across 17 agents...</span>
+                      <span>Executing live directive via {selectedModel === 'gpt-4o' ? 'OpenAI GPT-4o' : 'Gemini 4 Hydrogen'}...</span>
                     </div>
                   </div>
                 )}
@@ -1046,23 +1222,20 @@ export const CelesteWorkstation: React.FC<CelesteProps> = ({
                       onClick={() => setIsModelDropdownOpen(!isModelDropdownOpen)}
                       className="flex items-center gap-1.5 text-[11px] font-mono text-slate-300 hover:text-pink-200 px-2 py-0.5 rounded-lg bg-slate-800/60 hover:bg-slate-800 border border-slate-700/60 transition-colors cursor-pointer"
                     >
-                      <span>{selectedModel === 'gpt-4o' ? 'OpenAI GPT-4o' : selectedModel === 'gemini-2.5-flash' ? 'Gemini 2.5 Flash' : selectedModel}</span>
+                      <span>{selectedModel === 'gpt-4o' ? 'OpenAI GPT-4o' : 'Gemini 4 Hydrogen'}</span>
                       <ChevronUp className="w-3 h-3 text-pink-300" />
                     </button>
 
                     {isModelDropdownOpen && (
-                      <div className="absolute bottom-full mb-1.5 right-0 w-48 bg-[#111626] border border-pink-500/25 rounded-2xl shadow-2xl py-1.5 text-xs z-50 backdrop-blur-md">
+                      <div className="absolute bottom-full mb-1.5 right-0 w-52 bg-[#111626] border border-pink-500/25 rounded-2xl shadow-2xl py-1.5 text-xs z-50 backdrop-blur-md">
                         {[
-                          { id: 'gpt-4o', label: 'OpenAI GPT-4o' },
-                          { id: 'gemini-2.5-flash', label: 'Gemini 2.5 Flash' },
-                          { id: 'claude-3.5', label: 'Claude 3.5 Sonnet' },
-                          { id: 'deepseek-r1', label: 'DeepSeek-R1' },
-                          { id: 'kommandra-sovereign', label: 'KOMMANDRA Sovereign' }
+                          { id: 'gemini-4-hydrogen', label: 'Gemini 4 Hydrogen (Live)' },
+                          { id: 'gpt-4o', label: 'OpenAI GPT-4o (Live)' }
                         ].map(m => (
                           <button
                             key={m.id}
                             onClick={() => {
-                              setSelectedModel(m.id as any);
+                              setSelectedModel(m.id as 'gemini-4-hydrogen' | 'gpt-4o');
                               setIsModelDropdownOpen(false);
                             }}
                             className={`w-full text-left px-3 py-1.5 hover:bg-pink-500/15 text-xs transition-colors cursor-pointer ${
@@ -1400,36 +1573,48 @@ export const CelesteWorkstation: React.FC<CelesteProps> = ({
                       type="button"
                       onClick={() => {
                         setComposeSubject('Weekly Sovereign Revenue & 12h Sprint Report');
-                        setComposeBody('Executive Summary:\n\n- All 17 workforce agents operating at 100% capacity.\n- Scrap bank monetized with 3 newly deployed micro-SaaS modules.\n- Continuous 10-minute GitHub backup daemons verified.');
+                        setComposeBody('Executive Summary:\n\n- 17 workforce agents synchronized.\n- Scrap bank mined for highest-ROI launch opportunities.\n- Workspace archive & repo status verified.');
                       }}
                       className="px-2 py-0.5 rounded-lg bg-slate-800 text-[10px] text-pink-300 hover:bg-slate-700 cursor-pointer"
                     >
-                      📊 Executive Summary
+                      Executive Summary
                     </button>
                     <button
                       type="button"
                       onClick={() => {
                         setComposeSubject('Proposal: 24/7 AI Lead & Revenue Automation Retainer');
-                        setComposeBody('Hi there,\n\nWe deployed our autonomous revenue intelligence squad to audit your customer acquisition pipeline. Here is our turnkey $4,500/mo solution with 0 human overhead.');
+                        setComposeBody('Hi there,\n\nWe audited your customer acquisition workflow and prepared a custom interactive demo. Reply to activate our turnkey retainer.');
                       }}
                       className="px-2 py-0.5 rounded-lg bg-slate-800 text-[10px] text-sky-300 hover:bg-slate-700 cursor-pointer"
                     >
-                      🎯 Sales Proposal
+                      Sales Proposal
                     </button>
                   </div>
 
+                  {emailError && (
+                    <div className="p-2.5 rounded-xl bg-rose-500/15 border border-rose-400/35 text-rose-200 text-[11px] flex items-start gap-2">
+                      <AlertCircle className="w-4 h-4 shrink-0 mt-0.5 text-rose-300" />
+                      <span>{emailError}</span>
+                    </div>
+                  )}
+
                   <div className="flex items-center justify-end gap-2 pt-3 border-t border-slate-800">
                     <button
-                      onClick={() => setIsComposeOpen(false)}
-                      className="px-3 py-1.5 rounded-xl bg-slate-800 text-slate-300 hover:bg-slate-700"
+                      onClick={() => {
+                        setEmailError(null);
+                        setIsComposeOpen(false);
+                      }}
+                      className="px-3 py-1.5 rounded-xl bg-slate-800 text-slate-300 hover:bg-slate-700 cursor-pointer"
                     >
                       Cancel
                     </button>
                     <button
                       onClick={handleSendComposeEmail}
-                      className="px-4 py-1.5 rounded-xl bg-gradient-to-r from-pink-400 to-rose-400 text-slate-950 font-bold hover:from-pink-300 hover:to-rose-300 shadow-md shadow-pink-500/20 cursor-pointer"
+                      disabled={isSendingEmail || !composeSubject.trim() || !composeBody.trim()}
+                      className="px-4 py-1.5 rounded-xl bg-gradient-to-r from-pink-400 to-rose-400 text-slate-950 font-bold hover:from-pink-300 hover:to-rose-300 shadow-md shadow-pink-500/20 cursor-pointer flex items-center gap-1.5 disabled:opacity-50"
                     >
-                      Send Dispatch
+                      {isSendingEmail && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
+                      <span>{isSendingEmail ? 'Sending...' : 'Send Live Email'}</span>
                     </button>
                   </div>
                 </div>
@@ -1564,50 +1749,65 @@ export const CelesteWorkstation: React.FC<CelesteProps> = ({
               <div>
                 <h2 className="text-xl font-semibold text-slate-100 flex items-center gap-2">
                   <Brain className="w-5 h-5 text-pink-300" />
-                  <span>Autonomous AI Council & Border Moat</span>
+                  <span>Autonomous AI Engine & Moat Readiness</span>
                 </h2>
-                <p className="text-xs text-slate-400">Synthesizing consensus across OpenAI GPT-4o, Claude 3.5, Gemini 2.5, Grok 2, and DeepSeek</p>
+                <p className="text-xs text-slate-400">Live capability telemetry for Gemini 4 Hydrogen, OpenAI GPT-4o, Stripe, GitHub, and Resend</p>
               </div>
-              <div className="px-3 py-1 rounded-full bg-emerald-500/10 border border-emerald-500/30 text-emerald-300 text-xs font-semibold">
-                Moat Strength: 94.8%
+              <div className={`px-3 py-1 rounded-full border text-xs font-semibold ${
+                localCapabilities?.aiConfigured
+                  ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-300'
+                  : 'bg-rose-500/10 border-rose-500/30 text-rose-300'
+              }`}>
+                {localCapabilities?.aiConfigured ? `Active: ${localCapabilities.activeModel}` : 'AI Keys Required'}
               </div>
             </div>
 
-            {/* Deliberation cards */}
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
               <div className="p-4 rounded-2xl bg-[#121727]/90 border border-slate-800 space-y-2">
-                <span className="text-[10px] font-bold text-pink-300 uppercase">OpenAI GPT-4o</span>
+                <div className="flex items-center justify-between">
+                  <span className="text-[10px] font-bold text-pink-300 uppercase">Gemini 4 Hydrogen</span>
+                  <span className={`text-[10px] font-semibold ${localCapabilities?.geminiConfigured ? 'text-emerald-300' : 'text-amber-300'}`}>
+                    {localCapabilities?.geminiConfigured ? 'Live + Grounding' : 'Not Configured'}
+                  </span>
+                </div>
                 <p className="text-xs text-slate-300 leading-relaxed font-sans">
-                  "Recommend doubling down on high-margin local service automation packages with instant Stripe billing."
+                  Powers Google Search-grounded market research, 12h profit forecasting, outbound prospecting, and fast agent chat.
                 </p>
               </div>
               <div className="p-4 rounded-2xl bg-[#121727]/90 border border-slate-800 space-y-2">
-                <span className="text-[10px] font-bold text-sky-300 uppercase">Claude 3.5 Sonnet</span>
+                <div className="flex items-center justify-between">
+                  <span className="text-[10px] font-bold text-sky-300 uppercase">OpenAI GPT-4o</span>
+                  <span className={`text-[10px] font-semibold ${localCapabilities?.openaiConfigured ? 'text-emerald-300' : 'text-slate-400'}`}>
+                    {localCapabilities?.openaiConfigured ? 'Live Ready' : 'Optional / Not Set'}
+                  </span>
+                </div>
                 <p className="text-xs text-slate-300 leading-relaxed font-sans">
-                  "Maintain strict 10-minute backup daemons to prevent IP leakage. Protect scrap code library under local sovereign enclaves."
+                  Side-by-side structured deliberation, architecture planning, and JSON deliverable generation.
                 </p>
               </div>
               <div className="p-4 rounded-2xl bg-[#121727]/90 border border-slate-800 space-y-2">
-                <span className="text-[10px] font-bold text-amber-300 uppercase">Gemini 2.5 Flash</span>
+                <div className="flex items-center justify-between">
+                  <span className="text-[10px] font-bold text-emerald-300 uppercase">Live Revenue Ops</span>
+                  <span className="text-[10px] font-semibold text-sky-300">
+                    {localCapabilities?.stripeConfigured ? 'Stripe Live' : 'Stripe Pending'}
+                  </span>
+                </div>
                 <p className="text-xs text-slate-300 leading-relaxed font-sans">
-                  "Speed of deployment is the primary competitive moat. Package mined gems in under 4 hours per project."
+                  Connects live Stripe Payment Link minting, Resend outbound email, Git repo verification, and PKZIP snapshots.
                 </p>
               </div>
             </div>
 
             <div className="p-5 rounded-2xl bg-[#121727]/90 border border-pink-500/30 space-y-3">
-              <h3 className="font-bold text-sm text-pink-200">Unanimous Council Verdict</h3>
+              <h3 className="font-bold text-sm text-pink-200">Launch Real-Time Multi-Perspective Border Triage</h3>
               <p className="text-xs text-slate-300 leading-relaxed">
-                The multi-model council concludes that Apex Sovereign Capital should prioritize outbound client acquisition with Vanguard, while Matrix SaaS Forge continuously recycles scrap assets into turnkey recurring software subscriptions.
+                Evaluate inbound client inquiries, contracts, or system escalations using live AI triage in the Border Moat Council tab.
               </p>
               <button
-                onClick={() => {
-                  setActiveModule('chat');
-                  handleSendMessage('Council directive approved. Execute prioritized 12-hour sprint across all 17 agents.');
-                }}
+                onClick={() => onSelectTab && onSelectTab('border-council')}
                 className="px-4 py-2 rounded-xl bg-gradient-to-r from-pink-400 to-rose-400 text-slate-950 font-bold text-xs hover:from-pink-300 hover:to-rose-300 transition-all cursor-pointer shadow-md"
               >
-                Execute Council Directive
+                Open Live Border Moat Council
               </button>
             </div>
           </div>
@@ -1621,7 +1821,7 @@ export const CelesteWorkstation: React.FC<CelesteProps> = ({
                 <CalendarIcon className="w-5 h-5 text-sky-300" />
                 <span>33-Day 12-Hour Sprint Execution Calendar</span>
               </h2>
-              <p className="text-xs text-slate-400">Tracking every 12-hour revenue sprint from $0 to $33,000 target milestone</p>
+              <p className="text-xs text-slate-400">Tracking every 12-hour revenue sprint window toward your revenue target</p>
             </div>
 
             <div className="grid grid-cols-2 sm:grid-cols-4 md:grid-cols-7 gap-2.5">
@@ -1662,9 +1862,9 @@ export const CelesteWorkstation: React.FC<CelesteProps> = ({
             <div className="border-b border-pink-500/15 pb-4">
               <h2 className="text-xl font-semibold text-slate-100 flex items-center gap-2">
                 <GitCompare className="w-5 h-5 text-pink-300" />
-                <span>Multi-Model Benchmark Sandbox</span>
+                <span>Live Multi-Model Benchmark Sandbox</span>
               </h2>
-              <p className="text-xs text-slate-400">Test prompts simultaneously across GPT-4o, Claude 3.5 Sonnet, and Gemini 2.5 Flash</p>
+              <p className="text-xs text-slate-400">Execute the same tactical prompt live side-by-side across Gemini 4 Hydrogen and OpenAI GPT-4o</p>
             </div>
 
             <div className="space-y-3">
@@ -1672,7 +1872,7 @@ export const CelesteWorkstation: React.FC<CelesteProps> = ({
                 rows={2}
                 value={comparePrompt}
                 onChange={(e) => setComparePrompt(e.target.value)}
-                placeholder="Enter sovereign test prompt..."
+                placeholder="Enter test prompt..."
                 className="w-full bg-[#121727]/90 border border-pink-500/25 rounded-2xl p-3 text-xs text-slate-100 focus:outline-none focus:border-pink-400"
               />
               <button
@@ -1681,23 +1881,42 @@ export const CelesteWorkstation: React.FC<CelesteProps> = ({
                 className="px-4 py-2 rounded-xl bg-pink-500/20 hover:bg-pink-500/30 text-pink-200 border border-pink-400/30 text-xs font-semibold flex items-center gap-2 cursor-pointer"
               >
                 {isComparing ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Zap className="w-3.5 h-3.5 text-pink-300" />}
-                <span>Run Benchmark Comparison</span>
+                <span>Run Live Benchmark Comparison</span>
               </button>
             </div>
 
             {compareResults && (
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-2">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-2">
                 <div className="p-4 rounded-2xl bg-[#121727]/90 border border-slate-800 space-y-2">
-                  <span className="font-bold text-xs text-pink-300">OpenAI GPT-4o</span>
-                  <div className="whitespace-pre-wrap text-[11px] text-slate-300 font-sans leading-relaxed">{compareResults.gpt4o}</div>
+                  <div className="flex items-center justify-between">
+                    <span className="font-bold text-xs text-amber-300">Gemini 4 Hydrogen</span>
+                    {compareResults.gemini?.latencyMs !== undefined && (
+                      <span className="text-[10px] font-mono text-slate-400">{compareResults.gemini.latencyMs}ms</span>
+                    )}
+                  </div>
+                  {compareResults.gemini?.error ? (
+                    <div className="text-[11px] text-rose-300 bg-rose-500/10 border border-rose-400/25 p-2.5 rounded-xl">
+                      {compareResults.gemini.error}
+                    </div>
+                  ) : (
+                    <div className="whitespace-pre-wrap text-[11px] text-slate-300 font-sans leading-relaxed">{compareResults.gemini?.text}</div>
+                  )}
                 </div>
+
                 <div className="p-4 rounded-2xl bg-[#121727]/90 border border-slate-800 space-y-2">
-                  <span className="font-bold text-xs text-sky-300">Claude 3.5 Sonnet</span>
-                  <div className="whitespace-pre-wrap text-[11px] text-slate-300 font-sans leading-relaxed">{compareResults.claude}</div>
-                </div>
-                <div className="p-4 rounded-2xl bg-[#121727]/90 border border-slate-800 space-y-2">
-                  <span className="font-bold text-xs text-amber-300">Gemini 2.5 Flash</span>
-                  <div className="whitespace-pre-wrap text-[11px] text-slate-300 font-sans leading-relaxed">{compareResults.gemini}</div>
+                  <div className="flex items-center justify-between">
+                    <span className="font-bold text-xs text-pink-300">OpenAI GPT-4o</span>
+                    {compareResults.gpt4o?.latencyMs !== undefined && (
+                      <span className="text-[10px] font-mono text-slate-400">{compareResults.gpt4o.latencyMs}ms</span>
+                    )}
+                  </div>
+                  {compareResults.gpt4o?.error ? (
+                    <div className="text-[11px] text-rose-300 bg-rose-500/10 border border-rose-400/25 p-2.5 rounded-xl">
+                      {compareResults.gpt4o.error}
+                    </div>
+                  ) : (
+                    <div className="whitespace-pre-wrap text-[11px] text-slate-300 font-sans leading-relaxed">{compareResults.gpt4o?.text}</div>
+                  )}
                 </div>
               </div>
             )}
@@ -1712,7 +1931,7 @@ export const CelesteWorkstation: React.FC<CelesteProps> = ({
                 <BookOpen className="w-5 h-5 text-sky-300" />
                 <span>Autonomous Sovereign Cookbook</span>
               </h2>
-              <p className="text-xs text-slate-400">Pre-built, 1-click executable operational recipes for instant business execution</p>
+              <p className="text-xs text-slate-400">Pre-built, 1-click executable operational recipes for live execution</p>
             </div>
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -1720,25 +1939,25 @@ export const CelesteWorkstation: React.FC<CelesteProps> = ({
                 {
                   title: 'Cold Lead to Stripe Link in 3 Minutes',
                   category: 'Sales Execution',
-                  desc: 'Vanguard scrapes Google Maps, drafts a personalized teardown, and generates an instant $499 Stripe invoice.',
+                  desc: 'Scout high-intent prospects, draft a personalized teardown, and launch a recurring Stripe offer.',
                   action: 'Execute Lead Recipe'
                 },
                 {
                   title: 'Scrap-to-SaaS 4-Hour Repackager',
                   category: 'Matrix Forge',
-                  desc: 'Gem-Miner pulls raw backend scripts from scrap bank, wraps in Tailwind UI, and compiles Next.js project.',
+                  desc: 'Pull unfinished scripts from scrap bank, identify monetization scope, and build deliverables.',
                   action: 'Run Repackage Recipe'
                 },
                 {
-                  title: '10-Minute Continuous Git Auto-Snapshot',
+                  title: 'Workspace Archive & Repo Sync',
                   category: 'DevOps Moat',
-                  desc: 'Cron worker checks git diff, creates atomic commit, pushes to origin, and dispatches encrypted zip.',
-                  action: 'Trigger Auto-Snapshot'
+                  desc: 'Verify git status, check remote GitHub repo connectivity, and export a real PKZIP snapshot.',
+                  action: 'Trigger Sync & Archive'
                 },
                 {
                   title: 'High-Intent Client Video Audit Script',
                   category: 'Creative Ops',
-                  desc: 'Generates a 90-second Loom script highlighting 3 costly workflow bugs on the prospect website.',
+                  desc: 'Generate a concise Loom outreach script highlighting conversion fixes on a prospect website.',
                   action: 'Generate Loom Script'
                 }
               ].map((recipe, i) => (
@@ -1775,7 +1994,7 @@ export const CelesteWorkstation: React.FC<CelesteProps> = ({
                 <Microscope className="w-5 h-5 text-pink-300" />
                 <span>Autonomous Deep Research Engine</span>
               </h2>
-              <p className="text-xs text-slate-400">Generate exhaustive, verified market intelligence dossiers with multi-source crawling</p>
+              <p className="text-xs text-slate-400">Generate market intelligence dossiers grounded with live Google Search citations</p>
             </div>
 
             <div className="flex gap-2">
@@ -1792,9 +2011,16 @@ export const CelesteWorkstation: React.FC<CelesteProps> = ({
                 className="px-5 py-3 rounded-2xl bg-gradient-to-r from-pink-400 to-rose-400 text-slate-950 font-bold text-xs hover:from-pink-300 hover:to-rose-300 transition-all cursor-pointer flex items-center gap-2 shadow-md shadow-pink-500/20"
               >
                 {isResearching ? <Loader2 className="w-4 h-4 animate-spin" /> : <Search className="w-4 h-4" />}
-                <span>Research</span>
+                <span>Research Live</span>
               </button>
             </div>
+
+            {researchError && (
+              <div className="p-4 rounded-2xl bg-rose-500/15 border border-rose-400/35 text-xs text-rose-200 flex items-start gap-2">
+                <AlertCircle className="w-4 h-4 text-rose-300 shrink-0 mt-0.5" />
+                <span>{researchError}</span>
+              </div>
+            )}
 
             {researchReport && (
               <div className="p-6 rounded-2xl bg-[#121727]/90 border border-slate-800 space-y-4 shadow-xl">
@@ -1811,6 +2037,27 @@ export const CelesteWorkstation: React.FC<CelesteProps> = ({
                 <div className="whitespace-pre-wrap font-sans text-xs text-slate-200 leading-relaxed">
                   {researchReport}
                 </div>
+                {researchSources.length > 0 && (
+                  <div className="pt-3 border-t border-slate-800 space-y-2">
+                    <span className="text-[10px] font-bold text-sky-300 uppercase tracking-wider block">
+                      Google Search Grounding Sources
+                    </span>
+                    <div className="flex flex-wrap gap-2">
+                      {researchSources.map((src, sIdx) => (
+                        <a
+                          key={sIdx}
+                          href={src.uri}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-sky-500/10 hover:bg-sky-500/20 border border-sky-400/25 text-[11px] text-sky-200"
+                        >
+                          <ExternalLink className="w-3 h-3 shrink-0" />
+                          <span>{src.title}</span>
+                        </a>
+                      ))}
+                    </div>
+                  </div>
+                )}
               </div>
             )}
           </div>
@@ -1898,7 +2145,9 @@ export const CelesteWorkstation: React.FC<CelesteProps> = ({
                       updatedAt: 'Just now',
                       tags: ['New']
                     };
-                    setNotes([newN, ...notes]);
+                    const updated = [newN, ...notes];
+                    setNotes(updated);
+                    onUpdateNotes?.(updated);
                     setSelectedNote(newN);
                     setNoteTitle(newN.title);
                     setNoteContent(newN.content);
@@ -2075,83 +2324,126 @@ export const CelesteWorkstation: React.FC<CelesteProps> = ({
         )}
       </div>
 
-      {/* 4. CELESTE SETUP & CONFIGURATION MODAL (/setup) */}
+      {/* 4. CELESTE SETUP & LIVE CAPABILITIES MODAL (/setup) */}
       {isSetupModalOpen && (
         <div className="fixed inset-0 bg-black/75 backdrop-blur-xs flex items-center justify-center p-4 z-50 animate-in fade-in duration-200">
           <div className="bg-[#111626] border border-pink-500/30 rounded-2xl w-full max-w-xl shadow-2xl p-6 space-y-5 text-xs text-slate-200">
             <div className="flex items-center justify-between border-b border-slate-800 pb-3">
               <div className="flex items-center gap-2.5">
                 <div className="w-8 h-8 rounded-xl bg-gradient-to-tr from-pink-400/30 to-sky-400/30 border border-pink-300/40 text-pink-300 flex items-center justify-center font-bold">
-                  ⚙️
+                  <Settings className="w-4 h-4" />
                 </div>
                 <div>
                   <h3 className="text-sm font-bold text-white flex items-center gap-2">
-                    <span>KOMMANDRA Sovereign Configuration</span>
-                    <span className="px-2 py-0.5 rounded-full bg-pink-500/10 text-pink-300 text-[10px] font-semibold border border-pink-500/20">
-                      Ready
+                    <span>KOMMANDRA Live Capabilities & Setup</span>
+                    <span className={`px-2 py-0.5 rounded-full text-[10px] font-semibold border ${
+                      localCapabilities?.aiConfigured
+                        ? 'bg-emerald-500/10 text-emerald-300 border-emerald-500/25'
+                        : 'bg-rose-500/10 text-rose-300 border-rose-500/25'
+                    }`}>
+                      {localCapabilities?.aiConfigured ? 'AI Live' : 'Setup Needed'}
                     </span>
                   </h3>
-                  <p className="text-[11px] text-slate-400">Manage API keys, sovereign daemons & email recipients</p>
+                  <p className="text-[11px] text-slate-400">Server-side environment status & live connection diagnostics</p>
                 </div>
               </div>
               <button
                 onClick={() => setIsSetupModalOpen(false)}
-                className="p-1 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800"
+                className="p-1 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 cursor-pointer"
               >
                 <X className="w-4 h-4" />
               </button>
             </div>
 
-            {/* Status Grid */}
+            {/* Live Server Status Grid */}
             <div className="grid grid-cols-2 gap-3">
               <div className="p-3 rounded-xl bg-[#0d1220] border border-slate-800 space-y-1">
-                <span className="text-[10px] text-slate-400 font-semibold uppercase block">OpenAI GPT-4o</span>
+                <span className="text-[10px] text-slate-400 font-semibold uppercase block">Gemini 4 Hydrogen</span>
                 <div className="flex items-center justify-between">
-                  <span className="font-bold text-slate-100">Connected</span>
-                  <span className="w-2 h-2 rounded-full bg-emerald-400 shadow-xs shadow-emerald-400" />
+                  <span className="font-bold text-slate-100">
+                    {localCapabilities?.geminiConfigured ? 'Configured' : 'Missing GEMINI_API_KEY'}
+                  </span>
+                  <span className={`w-2 h-2 rounded-full ${localCapabilities?.geminiConfigured ? 'bg-emerald-400' : 'bg-rose-400'}`} />
                 </div>
               </div>
 
               <div className="p-3 rounded-xl bg-[#0d1220] border border-slate-800 space-y-1">
-                <span className="text-[10px] text-slate-400 font-semibold uppercase block">Gemini 2.5 Flash</span>
+                <span className="text-[10px] text-slate-400 font-semibold uppercase block">OpenAI GPT-4o</span>
                 <div className="flex items-center justify-between">
-                  <span className="font-bold text-slate-100">Operational</span>
-                  <span className="w-2 h-2 rounded-full bg-emerald-400 shadow-xs shadow-emerald-400" />
+                  <span className="font-bold text-slate-100">
+                    {localCapabilities?.openaiConfigured ? 'Configured' : 'Not Set'}
+                  </span>
+                  <span className={`w-2 h-2 rounded-full ${localCapabilities?.openaiConfigured ? 'bg-emerald-400' : 'bg-slate-500'}`} />
+                </div>
+              </div>
+
+              <div className="p-3 rounded-xl bg-[#0d1220] border border-slate-800 space-y-1">
+                <span className="text-[10px] text-slate-400 font-semibold uppercase block">Stripe Payment Links</span>
+                <div className="flex items-center justify-between">
+                  <span className="font-bold text-slate-100">
+                    {localCapabilities?.stripeConfigured ? 'Live API Ready' : 'Not Set'}
+                  </span>
+                  <span className={`w-2 h-2 rounded-full ${localCapabilities?.stripeConfigured ? 'bg-emerald-400' : 'bg-amber-400'}`} />
+                </div>
+              </div>
+
+              <div className="p-3 rounded-xl bg-[#0d1220] border border-slate-800 space-y-1">
+                <span className="text-[10px] text-slate-400 font-semibold uppercase block">Resend Email & GitHub</span>
+                <div className="flex items-center justify-between">
+                  <span className="font-bold text-slate-100">
+                    Email: {localCapabilities?.emailConfigured ? 'On' : 'Off'} · Git: {localCapabilities?.githubConfigured ? 'On' : 'Local'}
+                  </span>
+                  <span className={`w-2 h-2 rounded-full ${localCapabilities?.emailConfigured || localCapabilities?.githubConfigured ? 'bg-emerald-400' : 'bg-amber-400'}`} />
                 </div>
               </div>
             </div>
 
-            {/* 10-Minute Daemon & Recipient */}
+            {localCapabilities?.pingResult && (
+              <div className={`p-3 rounded-xl border text-[11px] ${
+                localCapabilities.pingResult.ok
+                  ? 'bg-emerald-500/10 border-emerald-400/30 text-emerald-200'
+                  : 'bg-rose-500/10 border-rose-400/30 text-rose-200'
+              }`}>
+                {localCapabilities.pingResult.ok
+                  ? `Live ping passed (${localCapabilities.pingResult.model}) in ${localCapabilities.pingResult.latencyMs}ms.`
+                  : `Live ping failed: ${localCapabilities.pingResult.error}`}
+              </div>
+            )}
+
+            {/* Export & Persistence Summary */}
             <div className="p-4 rounded-xl bg-[#0d1220] border border-pink-500/20 space-y-2">
               <div className="font-bold text-slate-100 flex items-center justify-between">
-                <span>10-Minute Continuous Git Daemon</span>
+                <span>Server-Side Persistence & Archive Export</span>
                 <span className="px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-400 text-[10px] font-semibold">Active</span>
               </div>
               <p className="text-slate-400 text-[11px] leading-relaxed">
-                Background daemon committing across 4 container repos and emailing encrypted backups to <strong>theaucklandassistant@gmail.com</strong> every 600s.
+                Workspace state persists server-side in <code className="text-pink-200">data/workspace.json</code>. Configure secrets safely via server environment variables; default recipient: <strong>{exportEmail}</strong>.
               </p>
             </div>
 
             {/* Action Buttons */}
-            <div className="flex items-center justify-between pt-2 border-t border-slate-800">
+            <div className="flex items-center justify-between pt-2 border-t border-slate-800 gap-2 flex-wrap">
               <button
                 onClick={() => {
                   setIsSetupModalOpen(false);
-                  if (onOpenDashboard) onOpenDashboard();
+                  if (onSelectTab) {
+                    onSelectTab('settings');
+                  } else if (onOpenDashboard) {
+                    onOpenDashboard();
+                  }
                 }}
                 className="px-3 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-semibold transition-colors cursor-pointer"
               >
-                Open Workforce Dashboard
+                Open Integration Settings
               </button>
 
               <button
-                onClick={() => {
-                  setIsSetupModalOpen(false);
-                  handleSendMessage('/push');
-                }}
-                className="px-4 py-2 rounded-xl bg-gradient-to-r from-pink-400 to-rose-400 hover:from-pink-300 hover:to-rose-300 text-slate-950 text-xs font-bold transition-all cursor-pointer shadow-md shadow-pink-500/20"
+                onClick={() => handleRefreshServerStatus(true)}
+                disabled={isTestingConnection}
+                className="px-4 py-2 rounded-xl bg-gradient-to-r from-pink-400 to-rose-400 hover:from-pink-300 hover:to-rose-300 text-slate-950 text-xs font-bold transition-all cursor-pointer shadow-md shadow-pink-500/20 flex items-center gap-1.5"
               >
-                Test Sovereign Daemon
+                {isTestingConnection && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
+                <span>{isTestingConnection ? 'Pinging AI...' : 'Run Live AI Ping'}</span>
               </button>
             </div>
           </div>

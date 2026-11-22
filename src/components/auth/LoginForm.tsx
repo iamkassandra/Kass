@@ -7,7 +7,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Alert, AlertDescription } from '@/components/ui/alert';
-import { Loader2, Shield, User, Lock } from 'lucide-react';
+import { Loader2, Sparkles, User, Lock } from 'lucide-react';
 
 interface LoginFormProps {
   onLoginSuccess?: (user: any, token: string) => void;
@@ -44,6 +44,7 @@ export function LoginForm({ onLoginSuccess, onLoginError }: LoginFormProps) {
     try {
       const response = await fetch('/api/auth/login', {
         method: 'POST',
+        credentials: 'include',
         headers: {
           'Content-Type': 'application/json'
         },
@@ -56,9 +57,7 @@ export function LoginForm({ onLoginSuccess, onLoginError }: LoginFormProps) {
       const data = await response.json();
 
       if (response.ok && data.success && data.token) {
-        // Store token in localStorage and cookies for full compatibility
         localStorage.setItem('auth_token', data.token);
-        document.cookie = `auth_token=${data.token}; path=/; max-age=86400; SameSite=Lax`;
 
         // Call success callback
         if (onLoginSuccess) {
@@ -81,36 +80,38 @@ export function LoginForm({ onLoginSuccess, onLoginError }: LoginFormProps) {
   };
 
   return (
-    <div className="flex items-center justify-center min-h-screen bg-gradient-to-br from-slate-50 to-slate-100 dark:from-slate-900 dark:to-slate-800">
-      <Card className="w-full max-w-md shadow-xl border-0 bg-white/80 dark:bg-slate-800/80 backdrop-blur-sm">
+    <div className="relative flex items-center justify-center min-h-screen bg-[#0a0d16] text-slate-100 p-4 overflow-hidden">
+      <div className="fixed inset-0 pointer-events-none bg-[radial-gradient(ellipse_80%_80%_at_50%_-20%,rgba(244,114,182,0.16),rgba(56,189,248,0.06),rgba(10,13,22,0.92))]" />
+
+      <Card className="relative z-10 w-full max-w-md rounded-2xl border border-pink-500/25 bg-[#111626]/90 backdrop-blur-xl shadow-2xl shadow-black/40">
         <CardHeader className="text-center pb-2">
-          <div className="mx-auto mb-4 w-16 h-16 bg-gradient-to-br from-blue-500 to-purple-600 rounded-full flex items-center justify-center">
-            <Shield className="w-8 h-8 text-white" />
+          <div className="mx-auto mb-4 w-14 h-14 rounded-2xl bg-gradient-to-tr from-pink-400 via-rose-300 to-sky-300 flex items-center justify-center shadow-lg shadow-pink-500/20 text-[#0a0d16]">
+            <Sparkles className="w-7 h-7" />
           </div>
-          <CardTitle className="text-2xl font-bold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
-            AI Agent Team
+          <CardTitle className="text-2xl font-bold tracking-tight bg-gradient-to-r from-pink-200 via-rose-100 to-sky-200 bg-clip-text text-transparent">
+            KOMMANDRA
           </CardTitle>
-          <CardDescription className="text-slate-600 dark:text-slate-400">
-            Secure access to your autonomous development platform
+          <CardDescription className="text-slate-400 text-xs">
+            Dreamy Soft Aesthetic · Ruthlessly Functional Executive Suite
           </CardDescription>
         </CardHeader>
 
         <form onSubmit={handleSubmit}>
           <CardContent className="space-y-4">
             {error && (
-              <Alert variant="destructive" className="bg-red-50 border-red-200 dark:bg-red-900/20 dark:border-red-800">
-                <AlertDescription className="text-red-700 dark:text-red-400">
+              <Alert variant="destructive" className="bg-rose-500/15 border-rose-400/30 text-rose-200">
+                <AlertDescription className="text-rose-200 text-xs">
                   {error}
                 </AlertDescription>
               </Alert>
             )}
 
             <div className="space-y-2">
-              <Label htmlFor="username" className="text-slate-700 dark:text-slate-300 font-medium">
+              <Label htmlFor="username" className="text-pink-100 text-xs font-medium">
                 Username
               </Label>
               <div className="relative">
-                <User className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-slate-400" />
+                <User className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-pink-300/70" />
                 <Input
                   id="username"
                   name="username"
@@ -120,17 +121,17 @@ export function LoginForm({ onLoginSuccess, onLoginError }: LoginFormProps) {
                   onChange={handleInputChange}
                   required
                   disabled={isLoading}
-                  className="pl-10 h-12 border-slate-200 dark:border-slate-700 focus:border-blue-500 dark:focus:border-blue-400 bg-white dark:bg-slate-800"
+                  className="pl-10 h-11 rounded-xl border-pink-500/20 focus:border-pink-400 bg-[#0a0d16]/90 text-slate-100 placeholder:text-slate-500"
                 />
               </div>
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="password" className="text-slate-700 dark:text-slate-300 font-medium">
+              <Label htmlFor="password" className="text-pink-100 text-xs font-medium">
                 Password
               </Label>
               <div className="relative">
-                <Lock className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-slate-400" />
+                <Lock className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-sky-300/70" />
                 <Input
                   id="password"
                   name="password"
@@ -140,22 +141,22 @@ export function LoginForm({ onLoginSuccess, onLoginError }: LoginFormProps) {
                   onChange={handleInputChange}
                   required
                   disabled={isLoading}
-                  className="pl-10 h-12 border-slate-200 dark:border-slate-700 focus:border-blue-500 dark:focus:border-blue-400 bg-white dark:bg-slate-800"
+                  className="pl-10 h-11 rounded-xl border-pink-500/20 focus:border-pink-400 bg-[#0a0d16]/90 text-slate-100 placeholder:text-slate-500"
                 />
               </div>
             </div>
 
-            <div className="text-sm text-slate-600 dark:text-slate-400 bg-blue-50 dark:bg-blue-900/20 p-3 rounded-lg border border-blue-200 dark:border-blue-800 flex items-center justify-between">
+            <div className="text-sm text-slate-300 bg-[#0d111d]/90 p-3 rounded-xl border border-pink-500/20 flex items-center justify-between">
               <div>
-                <p className="font-medium text-blue-700 dark:text-blue-300 mb-0.5">Admin Credentials:</p>
-                <p className="text-xs"><strong>Username:</strong> <code className="bg-blue-100 dark:bg-blue-900/40 px-1 py-0.5 rounded">admin</code></p>
-                <p className="text-xs mt-0.5"><strong>Password:</strong> <code className="bg-blue-100 dark:bg-blue-900/40 px-1 py-0.5 rounded">admin123</code></p>
+                <p className="font-semibold text-pink-200 text-xs mb-0.5">Executive Access</p>
+                <p className="text-xs text-slate-400">Username: <code className="bg-pink-500/15 text-pink-200 px-1.5 py-0.5 rounded font-mono">admin</code></p>
+                <p className="text-xs text-slate-400 mt-0.5">Password: <code className="bg-sky-500/15 text-sky-200 px-1.5 py-0.5 rounded font-mono">admin123</code></p>
               </div>
               <Button
                 type="button"
                 variant="outline"
                 size="sm"
-                className="text-xs h-8 border-blue-300 dark:border-blue-700 hover:bg-blue-100 dark:hover:bg-blue-900/40 text-blue-700 dark:text-blue-300"
+                className="text-xs h-8 rounded-xl border-pink-500/30 bg-[#111626] hover:bg-pink-500/20 text-pink-100"
                 onClick={() => setFormData({ username: 'admin', password: 'admin123' })}
               >
                 Auto-fill
@@ -167,7 +168,7 @@ export function LoginForm({ onLoginSuccess, onLoginError }: LoginFormProps) {
             <Button
               type="submit"
               disabled={isLoading || !formData.username || !formData.password}
-              className="w-full h-12 bg-gradient-to-r from-blue-500 to-purple-600 hover:from-blue-600 hover:to-purple-700 text-white font-medium rounded-lg transition-all duration-200 transform hover:scale-[1.02] disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none"
+              className="w-full h-11 bg-gradient-to-r from-pink-400 via-rose-300 to-sky-300 hover:from-pink-300 hover:to-sky-200 text-[#0a0d16] font-bold rounded-xl transition-all duration-200 shadow-lg shadow-pink-500/20 disabled:opacity-50 disabled:cursor-not-allowed"
             >
               {isLoading ? (
                 <>
@@ -175,15 +176,15 @@ export function LoginForm({ onLoginSuccess, onLoginError }: LoginFormProps) {
                   Signing in...
                 </>
               ) : (
-                'Sign In'
+                'Enter KOMMANDRA Suite'
               )}
             </Button>
           </CardFooter>
         </form>
 
         <div className="text-center pb-6">
-          <p className="text-xs text-slate-500 dark:text-slate-400">
-            Secured by enterprise-grade authentication
+          <p className="text-[11px] text-slate-400">
+            Zero-leakage sovereign executive authentication
           </p>
         </div>
       </Card>

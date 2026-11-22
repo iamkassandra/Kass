@@ -1,33 +1,41 @@
-import { NextRequest, NextResponse } from 'next/server';
-import { openAIService, OPENAI_MODEL, isOpenAIConfigured } from '@/lib/services/OpenAIService';
+import { NextResponse } from 'next/server';
+import { withAuth, AuthenticatedRequest } from '@/middleware/auth';
+import {
+  openAIService,
+  isOpenAIConfigured,
+  isGeminiConfigured,
+  getActiveModelLabel,
+} from '@/lib/services/OpenAIService';
 
-export async function GET(req: NextRequest) {
+export const GET = withAuth(async (req: AuthenticatedRequest) => {
   try {
-    const isConfigured = isOpenAIConfigured();
-    
-    // Check if user requested a live ping test
     const { searchParams } = new URL(req.url);
     const testPing = searchParams.get('test') === 'true';
+    const configured = isGeminiConfigured() || isOpenAIConfigured();
 
     let pingResult = null;
-    if (testPing && isConfigured) {
+    if (testPing) {
       pingResult = await openAIService.verifyConnection();
     }
 
     return NextResponse.json({
       success: true,
-      configured: isConfigured,
-      model: OPENAI_MODEL,
-      engine: 'OpenAI GPT-4o (Omni)',
+      configured,
+      geminiConfigured: isGeminiConfigured(),
+      openaiConfigured: isOpenAIConfigured(),
+      model: getActiveModelLabel(),
       pingResult,
-      timestamp: new Date().toISOString()
+      timestamp: new Date().toISOString(),
     });
   } catch (error: any) {
-    return NextResponse.json({
-      success: false,
-      configured: isOpenAIConfigured(),
-      model: OPENAI_MODEL,
-      error: error?.message || 'Failed to query OpenAI status'
-    }, { status: 500 });
+    return NextResponse.json(
+      {
+        success: false,
+        configured: isGeminiConfigured() || isOpenAIConfigured(),
+        model: getActiveModelLabel(),
+        error: error?.message || 'Failed to query AI status',
+      },
+      { status: 500 }
+    );
   }
-}
+});

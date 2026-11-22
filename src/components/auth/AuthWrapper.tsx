@@ -24,9 +24,10 @@ export function AuthWrapper({ children }: AuthWrapperProps) {
   const [isLoading, setIsLoading] = useState(true);
   const [user, setUser] = useState<UserData | null>(null);
 
-  // Define protected routes that require authentication
-  const protectedRoutes = ['/dashboard', '/demo'];
-  const isProtectedRoute = Boolean(pathname && protectedRoutes.some(route => pathname.startsWith(route)));
+  // Define protected routes that require authentication (exact '/' or prefix match for /dashboard, /demo)
+  const isProtectedRoute = Boolean(
+    pathname === '/' || pathname?.startsWith('/dashboard') || pathname?.startsWith('/demo')
+  );
 
   useEffect(() => {
     let isMounted = true;
@@ -54,7 +55,6 @@ export function AuthWrapper({ children }: AuthWrapperProps) {
           if (data.success && data.user && data.token) {
             if (typeof window !== 'undefined') {
               localStorage.setItem('auth_token', data.token);
-              document.cookie = `auth_token=${data.token}; path=/; max-age=86400; SameSite=Lax`;
             }
             if (isMounted) {
               setUser(data.user);
@@ -75,28 +75,15 @@ export function AuthWrapper({ children }: AuthWrapperProps) {
       setIsLoading(true);
 
       try {
-        let token: string | null = null;
-        if (typeof window !== 'undefined') {
-          token = localStorage.getItem('auth_token');
-          if (!token) {
-            const match = document.cookie.match(/(?:^|;\s*)auth_token=([^;]+)/);
-            if (match) {
-              token = match[1];
-              localStorage.setItem('auth_token', token);
-            }
-          }
-        }
-
-        if (!token) {
-          await attemptTokenRefresh();
-          return;
+        const token = typeof window !== 'undefined' ? localStorage.getItem('auth_token') : null;
+        const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+        if (token) {
+          headers['Authorization'] = `Bearer ${token}`;
         }
 
         const response = await fetch('/api/auth/me', {
-          headers: {
-            'Authorization': `Bearer ${token}`,
-            'Content-Type': 'application/json'
-          }
+          headers,
+          credentials: 'include'
         });
 
         if (response.ok) {
@@ -112,9 +99,7 @@ export function AuthWrapper({ children }: AuthWrapperProps) {
         }
 
         await attemptTokenRefresh();
-
-      } catch (error) {
-        // Silently handle fetch or connection errors
+      } catch {
         handleAuthFailure();
       }
     };
@@ -122,32 +107,26 @@ export function AuthWrapper({ children }: AuthWrapperProps) {
     if (isProtectedRoute) {
       checkAuth();
     } else {
-      // Check auth state silently in background for public routes
-      let token: string | null = null;
-      if (typeof window !== 'undefined') {
-        token = localStorage.getItem('auth_token');
-      }
+      const token = typeof window !== 'undefined' ? localStorage.getItem('auth_token') : null;
+      const headers: Record<string, string> = { 'Content-Type': 'application/json' };
       if (token) {
-        fetch('/api/auth/me', {
-          headers: {
-            'Authorization': `Bearer ${token}`,
-            'Content-Type': 'application/json'
+        headers['Authorization'] = `Bearer ${token}`;
+      }
+      fetch('/api/auth/me', {
+        headers,
+        credentials: 'include'
+      })
+        .then(res => (res.ok ? res.json() : null))
+        .then(data => {
+          if (data?.success && data?.user && isMounted) {
+            setUser(data.user);
+            setIsAuthenticated(true);
           }
         })
-          .then(res => res.ok ? res.json() : null)
-          .then(data => {
-            if (data?.success && data?.user && isMounted) {
-              setUser(data.user);
-              setIsAuthenticated(true);
-            }
-          })
-          .catch(() => {})
-          .finally(() => {
-            if (isMounted) setIsLoading(false);
-          });
-      } else {
-        setIsLoading(false);
-      }
+        .catch(() => {})
+        .finally(() => {
+          if (isMounted) setIsLoading(false);
+        });
     }
 
     return () => {
@@ -165,25 +144,24 @@ export function AuthWrapper({ children }: AuthWrapperProps) {
   const handleLogout = async () => {
     try {
       const token = typeof window !== 'undefined' ? localStorage.getItem('auth_token') : null;
+      const headers: Record<string, string> = { 'Content-Type': 'application/json' };
       if (token) {
-        await fetch('/api/auth/logout', {
-          method: 'POST',
-          headers: {
-            'Authorization': `Bearer ${token}`,
-            'Content-Type': 'application/json'
-          }
-        });
+        headers['Authorization'] = `Bearer ${token}`;
       }
+      await fetch('/api/auth/logout', {
+        method: 'POST',
+        headers,
+        credentials: 'include'
+      });
     } catch {
       // Ignore logout network error
     } finally {
       if (typeof window !== 'undefined') {
         localStorage.removeItem('auth_token');
-        document.cookie = 'auth_token=; path=/; max-age=0; SameSite=Lax';
       }
       setUser(null);
       setIsAuthenticated(false);
-      router.push('/');
+      router.push('/login');
     }
   };
 
@@ -194,21 +172,21 @@ export function AuthWrapper({ children }: AuthWrapperProps) {
         {/* Show user indicator for authenticated users on public pages */}
         {isAuthenticated && (
           <div className="fixed top-4 right-4 z-50">
-            <div className="flex items-center space-x-3 bg-white/90 dark:bg-slate-800/90 backdrop-blur-sm rounded-lg shadow-lg px-4 py-2 border border-slate-200 dark:border-slate-700">
+            <div className="flex items-center space-x-3 bg-[#111626]/90 backdrop-blur-md rounded-xl shadow-xl shadow-black/40 px-4 py-2 border border-pink-500/25">
               <div className="flex items-center space-x-2">
-                <div className="w-8 h-8 bg-gradient-to-br from-blue-500 to-purple-600 rounded-full flex items-center justify-center">
-                  <User className="w-4 h-4 text-white" />
+                <div className="w-8 h-8 bg-gradient-to-tr from-pink-400 via-rose-300 to-sky-300 rounded-full flex items-center justify-center shadow-sm shadow-pink-500/20">
+                  <User className="w-4 h-4 text-[#0a0d16]" />
                 </div>
                 <div className="text-sm">
-                  <p className="font-medium text-slate-900 dark:text-slate-100">{user?.username}</p>
-                  <p className="text-xs text-slate-500 dark:text-slate-400 capitalize">{user?.role}</p>
+                  <p className="font-semibold text-slate-100">{user?.username}</p>
+                  <p className="text-xs text-pink-200/80 capitalize">{user?.role}</p>
                 </div>
               </div>
               <Button
                 onClick={() => router.push('/dashboard')}
                 variant="ghost"
                 size="sm"
-                className="h-8 px-3 hover:bg-blue-50 dark:hover:bg-blue-900/20 hover:text-blue-600 dark:hover:text-blue-400"
+                className="h-8 px-3 text-pink-100 hover:bg-pink-500/15 hover:text-pink-200"
               >
                 Dashboard
               </Button>
@@ -216,7 +194,7 @@ export function AuthWrapper({ children }: AuthWrapperProps) {
                 onClick={handleLogout}
                 variant="ghost"
                 size="sm"
-                className="h-8 w-8 p-0 hover:bg-red-50 dark:hover:bg-red-900/20 hover:text-red-600 dark:hover:text-red-400"
+                className="h-8 w-8 p-0 text-slate-300 hover:bg-rose-500/15 hover:text-rose-300"
               >
                 <LogOut className="w-4 h-4" />
               </Button>
@@ -231,14 +209,15 @@ export function AuthWrapper({ children }: AuthWrapperProps) {
   // For protected routes, show loading while checking auth
   if (isLoading) {
     return (
-      <div className="flex items-center justify-center min-h-screen bg-gradient-to-br from-slate-50 to-slate-100 dark:from-slate-900 dark:to-slate-800">
-        <div className="text-center">
-          <div className="mx-auto mb-4 w-16 h-16 bg-gradient-to-br from-blue-500 to-purple-600 rounded-full flex items-center justify-center animate-pulse">
-            <Shield className="w-8 h-8 text-white" />
+      <div className="flex items-center justify-center min-h-screen bg-[#0a0d16] relative overflow-hidden">
+        <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_75%_65%_at_50%_20%,rgba(244,114,182,0.14),rgba(56,189,248,0.06),transparent)]" />
+        <div className="text-center relative z-10">
+          <div className="mx-auto mb-4 w-16 h-16 bg-gradient-to-tr from-pink-400 via-rose-300 to-sky-300 rounded-2xl flex items-center justify-center shadow-lg shadow-pink-500/25 animate-pulse">
+            <Shield className="w-8 h-8 text-[#0a0d16]" />
           </div>
           <div className="flex items-center justify-center space-x-2">
-            <Loader2 className="w-5 h-5 animate-spin text-blue-600" />
-            <span className="text-slate-600 dark:text-slate-400">Verifying authentication...</span>
+            <Loader2 className="w-5 h-5 animate-spin text-pink-300" />
+            <span className="text-pink-100/85 text-sm font-medium">Verifying authentication...</span>
           </div>
         </div>
       </div>
@@ -248,10 +227,10 @@ export function AuthWrapper({ children }: AuthWrapperProps) {
   // If unauthenticated on protected route, show redirect message while effect handles navigation
   if (!isAuthenticated) {
     return (
-      <div className="flex items-center justify-center min-h-screen bg-slate-900 text-slate-300">
+      <div className="flex items-center justify-center min-h-screen bg-[#0a0d16] text-pink-100">
         <div className="text-center">
-          <Loader2 className="w-6 h-6 animate-spin mx-auto mb-3 text-blue-500" />
-          <p className="text-sm">Redirecting to sign in...</p>
+          <Loader2 className="w-6 h-6 animate-spin mx-auto mb-3 text-pink-300" />
+          <p className="text-sm text-slate-300">Redirecting to sign in...</p>
         </div>
       </div>
     );
@@ -261,21 +240,21 @@ export function AuthWrapper({ children }: AuthWrapperProps) {
     <div className="authenticated-app">
       {/* Logout button in top right */}
       <div className="fixed top-4 right-4 z-50">
-        <div className="flex items-center space-x-3 bg-white/90 dark:bg-slate-800/90 backdrop-blur-sm rounded-lg shadow-lg px-4 py-2 border border-slate-200 dark:border-slate-700">
+        <div className="flex items-center space-x-3 bg-[#111626]/90 backdrop-blur-md rounded-xl shadow-xl shadow-black/40 px-4 py-2 border border-pink-500/25">
           <div className="flex items-center space-x-2">
-            <div className="w-8 h-8 bg-gradient-to-br from-blue-500 to-purple-600 rounded-full flex items-center justify-center">
-              <User className="w-4 h-4 text-white" />
+            <div className="w-8 h-8 bg-gradient-to-tr from-pink-400 via-rose-300 to-sky-300 rounded-full flex items-center justify-center shadow-sm shadow-pink-500/20">
+              <User className="w-4 h-4 text-[#0a0d16]" />
             </div>
             <div className="text-sm">
-              <p className="font-medium text-slate-900 dark:text-slate-100">{user?.username}</p>
-              <p className="text-xs text-slate-500 dark:text-slate-400 capitalize">{user?.role}</p>
+              <p className="font-semibold text-slate-100">{user?.username}</p>
+              <p className="text-xs text-pink-200/80 capitalize">{user?.role}</p>
             </div>
           </div>
           <Button
             onClick={handleLogout}
             variant="ghost"
             size="sm"
-            className="h-8 w-8 p-0 hover:bg-red-50 dark:hover:bg-red-900/20 hover:text-red-600 dark:hover:text-red-400"
+            className="h-8 w-8 p-0 text-slate-300 hover:bg-rose-500/15 hover:text-rose-300"
           >
             <LogOut className="w-4 h-4" />
           </Button>

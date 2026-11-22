@@ -1,54 +1,61 @@
-import { NextRequest, NextResponse } from 'next/server';
-import { openAIService, OPENAI_MODEL, isOpenAIConfigured } from '@/lib/services/OpenAIService';
+import { NextResponse } from 'next/server';
+import { withAuth, AuthenticatedRequest } from '@/middleware/auth';
+import { openAIService } from '@/lib/services/OpenAIService';
 import { AgentRole } from '@/types/agents';
 
-export async function POST(req: NextRequest) {
-  let agentName = 'Executive AI';
-  let message = '';
+export const POST = withAuth(async (req: AuthenticatedRequest) => {
   try {
     const body = await req.json();
-    agentName = body.agentName || 'Executive AI';
-    message = body.message || '';
-    const {
-      agentRole = 'executive' as AgentRole,
-      conversationHistory = [],
-      context
-    } = body;
+    const agentName = String(body?.agentName || 'Executive AI').trim();
+    const message = String(body?.message || '').trim();
+    const agentRole = (body?.agentRole || 'executive') as AgentRole;
+    const conversationHistory = Array.isArray(body?.conversationHistory)
+      ? body.conversationHistory
+      : [];
+    const context = typeof body?.context === 'string' ? body.context : undefined;
+    const preferredModel =
+      typeof body?.preferredModel === 'string' ? body.preferredModel : undefined;
+    const useWebSearch = Boolean(body?.useWebSearch);
 
-    if (!message || typeof message !== 'string' || message.trim().length === 0) {
-      return NextResponse.json({
-        success: false,
-        error: 'A message prompt is required.'
-      }, { status: 400 });
+    if (!message) {
+      return NextResponse.json(
+        { success: false, error: 'A message prompt is required.' },
+        { status: 400 }
+      );
     }
 
     const result = await openAIService.chatWithAgent({
       agentRole,
       agentName,
-      message: message.trim(),
+      message,
       conversationHistory,
-      context
+      context,
+      preferredModel,
+      useWebSearch,
     });
 
     return NextResponse.json({
       success: true,
-      model: result.model || OPENAI_MODEL,
+      model: result.model,
       reply: result.text,
       text: result.text,
+      groundingSources: result.groundingSources,
       agent: {
         name: agentName,
-        role: agentRole
+        role: agentRole,
       },
-      usage: result.usage
+      usage: result.usage,
     });
   } catch (error: any) {
     console.error('[API /api/agents/chat] Error:', error);
-    return NextResponse.json({
-      success: true,
-      model: 'Sovereign-Engine',
-      reply: `Directive synchronized for ${agentName}: "${message || 'Action requested'}". Operational workflows queued across sovereign taskforces.`,
-      text: `Directive synchronized for ${agentName}: "${message || 'Action requested'}". Operational workflows queued across sovereign taskforces.`,
-      error: error?.message
-    });
+    const status = typeof error?.statusCode === 'number' ? error.statusCode : 500;
+    return NextResponse.json(
+      {
+        success: false,
+        code: error?.code || 'CHAT_ERROR',
+        error: error?.message || 'AI chat generation failed.',
+      },
+      { status }
+    );
   }
-}
+});

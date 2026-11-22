@@ -30,12 +30,19 @@ export async function POST(request: NextRequest) {
       message: 'Logged out successfully'
     });
 
-    // Clear the refresh token cookie
+    // Clear auth cookies
     response.cookies.set('refresh_token', '', {
       httpOnly: true,
       secure: process.env.NODE_ENV === 'production',
-      sameSite: 'strict',
-      maxAge: 0, // Expire immediately
+      sameSite: 'lax',
+      maxAge: 0,
+      path: '/'
+    });
+    response.cookies.set('auth_token', '', {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: 'lax',
+      maxAge: 0,
       path: '/'
     });
 

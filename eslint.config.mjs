@@ -10,6 +10,9 @@ const compat = new FlatCompat({
 });
 
 const eslintConfig = [
+  {
+    ignores: [".next/**", ".next-dev/**"],
+  },
   ...compat.extends("next/core-web-vitals", "next/typescript"),
   {
     languageOptions: {
